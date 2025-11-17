@@ -108,7 +108,7 @@ export function ColorPicker() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="h-10 w-10 rounded-md border-2 border-gray-300 dark:border-gray-700 shadow-sm"
+          className="h-10 w-10 rounded-md border-2 border-border shadow-sm hover:shadow-md transition-shadow ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           style={{ backgroundColor: brushSettings.color }}
           aria-label="Color picker"
         />
@@ -116,7 +116,7 @@ export function ColorPicker() {
       <PopoverContent className="w-80">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="hue">Hue</Label>
+            <Label htmlFor="hue" className="text-sm font-medium">Hue</Label>
             <Slider
               id="hue"
               min={0}
@@ -129,7 +129,7 @@ export function ColorPicker() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="saturation">Saturation</Label>
+            <Label htmlFor="saturation" className="text-sm font-medium">Saturation</Label>
             <Slider
               id="saturation"
               min={0}
@@ -142,7 +142,7 @@ export function ColorPicker() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lightness">Lightness</Label>
+            <Label htmlFor="lightness" className="text-sm font-medium">Lightness</Label>
             <Slider
               id="lightness"
               min={0}
@@ -155,7 +155,7 @@ export function ColorPicker() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="hex">Hex</Label>
+            <Label htmlFor="hex" className="text-sm font-medium">Hex</Label>
             <Input
               id="hex"
               value={brushSettings.color}

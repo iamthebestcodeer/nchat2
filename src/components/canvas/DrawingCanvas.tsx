@@ -192,7 +192,7 @@ export function DrawingCanvas() {
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden bg-gray-100 dark:bg-gray-900"
+      className="relative h-full w-full overflow-hidden bg-muted/30"
     >
       <canvas
         ref={canvasRef}

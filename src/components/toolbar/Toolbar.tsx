@@ -10,7 +10,7 @@ export function Toolbar() {
   const { currentTool, setCurrentTool } = useDrawingStore();
 
   return (
-    <div className="flex items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4">
+    <div className="flex items-center gap-4 border-b border-border bg-card px-6 py-4">
       <Tabs value={currentTool} onValueChange={(value) => setCurrentTool(value as "brush" | "eraser")}>
         <TabsList>
           <TabsTrigger value="brush" className="gap-2">
@@ -23,7 +23,7 @@ export function Toolbar() {
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-3">
         <ColorPicker />
       </div>
     </div>
