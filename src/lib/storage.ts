@@ -1,6 +1,14 @@
 import type { BrushSettings, Layer, Tool } from "./store/drawingStore";
 
-const STORAGE_KEY = "drawing-app-state";
+const STORAGE_KEY = "drawing-app-state"; // Legacy key
+const PROJECTS_KEY = "drawing-app-projects";
+
+export type Project = {
+  id: string;
+  name: string;
+  lastModified: number;
+  thumbnail?: string;
+};
 
 export type SerializableLayer = {
   id: string;
@@ -84,7 +92,7 @@ export async function deserializeLayers(
 /**
  * Helper to create canvas from image data (async version)
  */
-async function createCanvasFromImageData(
+function createCanvasFromImageData(
   imageData: string,
   width: number,
   height: number
@@ -98,7 +106,7 @@ async function createCanvasFromImageData(
       context.fillStyle = "transparent";
       context.fillRect(0, 0, width, height);
     }
-    return canvas;
+    return Promise.resolve(canvas);
   }
 
   try {
@@ -107,7 +115,7 @@ async function createCanvasFromImageData(
     canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) {
-      return null;
+      return Promise.resolve(null);
     }
 
     return new Promise<HTMLCanvasElement | null>((resolve) => {
@@ -125,17 +133,113 @@ async function createCanvasFromImageData(
     });
   } catch (error) {
     console.error("Error creating canvas from base64:", error);
-    return null;
+    return Promise.resolve(null);
   }
 }
 
 /**
- * Saves state to localStorage
+ * Get all projects
  */
-export function saveStateToStorage(state: SerializableState): boolean {
+export function getAllProjects(): Project[] {
+  try {
+    // Check for legacy state and migrate if needed
+    const legacyState = localStorage.getItem(STORAGE_KEY);
+    if (legacyState) {
+      const projects = JSON.parse(localStorage.getItem(PROJECTS_KEY) || "[]");
+      // Only migrate if we haven't already (simple check: if projects is empty but legacy exists)
+      // Or we could just migrate it to a "Untitled Project" and delete legacy
+      if (projects.length === 0) {
+        const newProject: Project = {
+          id: crypto.randomUUID(),
+          name: "Untitled Project",
+          lastModified: Date.now(),
+        };
+        localStorage.setItem(PROJECTS_KEY, JSON.stringify([newProject]));
+        localStorage.setItem(`project-${newProject.id}`, legacyState);
+        localStorage.removeItem(STORAGE_KEY);
+        return [newProject];
+      }
+    }
+
+    const projects = localStorage.getItem(PROJECTS_KEY);
+    return projects ? JSON.parse(projects) : [];
+  } catch (error) {
+    console.error("Error getting projects:", error);
+    return [];
+  }
+}
+
+/**
+ * Create a new project
+ */
+export function createProject(name: string): Project {
+  const newProject: Project = {
+    id: crypto.randomUUID(),
+    name,
+    lastModified: Date.now(),
+  };
+
+  const projects = getAllProjects();
+  projects.push(newProject);
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+
+  return newProject;
+}
+
+/**
+ * Delete a project
+ */
+export function deleteProject(id: string): void {
+  const projects = getAllProjects().filter((p) => p.id !== id);
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  localStorage.removeItem(`project-${id}`);
+}
+
+/**
+ * Rename a project
+ */
+export function renameProject(id: string, newName: string): void {
+  const projects = getAllProjects().map((p) =>
+    p.id === id ? { ...p, name: newName, lastModified: Date.now() } : p
+  );
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+}
+
+/**
+ * Saves state to localStorage for a specific project
+ */
+export function saveStateToStorage(
+  state: SerializableState,
+  projectId?: string
+): boolean {
   try {
     const serialized = JSON.stringify(state);
-    localStorage.setItem(STORAGE_KEY, serialized);
+
+    if (projectId) {
+      localStorage.setItem(`project-${projectId}`, serialized);
+
+      // Update last modified and thumbnail
+      const projects = getAllProjects();
+      const projectIndex = projects.findIndex((p) => p.id === projectId);
+      if (projectIndex !== -1) {
+        // Generate thumbnail from first visible layer or composite
+        // For now, we'll just update the timestamp
+        projects[projectIndex].lastModified = Date.now();
+
+        // Try to generate a thumbnail from the first visible layer
+        const visibleLayer = state.layers.find((l) => l.visible && l.imageData);
+        if (visibleLayer) {
+          // We could store a small thumbnail here, but for now let's just store the timestamp
+          // Storing full base64 in the project list might be too heavy
+        }
+
+        localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+      }
+    } else {
+      // Fallback to legacy key if no projectId provided (shouldn't happen with new flow)
+      localStorage.setItem(STORAGE_KEY, serialized);
+    }
+
     return true;
   } catch (error) {
     if (error instanceof DOMException && error.name === "QuotaExceededError") {
@@ -148,11 +252,20 @@ export function saveStateToStorage(state: SerializableState): boolean {
 }
 
 /**
- * Loads state from localStorage
+ * Loads state from localStorage for a specific project
  */
-export function loadStateFromStorage(): SerializableState | null {
+export function loadStateFromStorage(
+  projectId?: string
+): SerializableState | null {
   try {
-    const serialized = localStorage.getItem(STORAGE_KEY);
+    let serialized: string | null = null;
+
+    if (projectId) {
+      serialized = localStorage.getItem(`project-${projectId}`);
+    } else {
+      serialized = localStorage.getItem(STORAGE_KEY);
+    }
+
     if (!serialized) {
       return null;
     }
@@ -166,9 +279,13 @@ export function loadStateFromStorage(): SerializableState | null {
 /**
  * Clears saved state from localStorage
  */
-export function clearStateFromStorage(): void {
+export function clearStateFromStorage(projectId?: string): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    if (projectId) {
+      localStorage.removeItem(`project-${projectId}`);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   } catch (error) {
     console.error("Error clearing state from storage:", error);
   }

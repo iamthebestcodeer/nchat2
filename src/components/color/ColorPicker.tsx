@@ -205,7 +205,7 @@ export function ColorPicker() {
     const rect = colorAreaRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-    
+
     const s = Math.round(x * 100);
     const l = Math.round((1 - y) * 100);
     handleHslChange(hsl[0], s, l);
@@ -256,10 +256,10 @@ export function ColorPicker() {
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 border-2 p-0"
           aria-label="Color picker"
+          className="h-10 w-10 border-2 p-0"
+          size="icon"
+          variant="outline"
         >
           <div
             className="h-full w-full rounded-md"
@@ -276,7 +276,7 @@ export function ColorPicker() {
               style={{ backgroundColor: brushSettings.color }}
             />
             <Input
-              className="font-mono h-8 text-sm flex-1"
+              className="h-8 flex-1 font-mono text-sm"
               id="hex"
               onChange={(e) => handleHexChange(e.target.value)}
               placeholder="#000000"
@@ -289,23 +289,23 @@ export function ColorPicker() {
             <div className="relative flex gap-2">
               {/* Saturation/Lightness 2D Area */}
               <div
+                className="relative h-24 w-24 cursor-crosshair touch-none rounded-md border border-border shadow-sm"
+                onClick={handleColorAreaClick}
+                onMouseDown={() => setIsDragging(true)}
+                onMouseLeave={() => setIsDragging(false)}
+                onMouseMove={handleColorAreaMouseMove}
+                onMouseUp={() => setIsDragging(false)}
+                onTouchEnd={handleColorAreaTouchEnd}
+                onTouchMove={handleColorAreaTouchMove}
+                onTouchStart={handleColorAreaTouchStart}
                 ref={colorAreaRef}
-                className="relative h-24 w-24 cursor-crosshair rounded-md border border-border shadow-sm touch-none"
                 style={{
                   background: `linear-gradient(to top, black 0%, transparent 50%, white 100%), linear-gradient(to right, transparent 0%, ${hueColor} 100%)`,
                 }}
-                onClick={handleColorAreaClick}
-                onMouseDown={() => setIsDragging(true)}
-                onMouseUp={() => setIsDragging(false)}
-                onMouseLeave={() => setIsDragging(false)}
-                onMouseMove={handleColorAreaMouseMove}
-                onTouchStart={handleColorAreaTouchStart}
-                onTouchMove={handleColorAreaTouchMove}
-                onTouchEnd={handleColorAreaTouchEnd}
               >
                 {/* Color indicator */}
                 <div
-                  className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md"
+                  className="-translate-x-1/2 -translate-y-1/2 absolute h-2.5 w-2.5 rounded-full border-2 border-white shadow-md"
                   style={{
                     left: `${indicatorX}%`,
                     top: `${indicatorY}%`,
@@ -317,15 +317,15 @@ export function ColorPicker() {
               {/* Hue Slider */}
               <div className="flex flex-col items-center">
                 <Slider
-                  orientation="vertical"
                   className="h-24"
-                  min={0}
                   max={360}
-                  step={1}
-                  value={[hsl[0]]}
+                  min={0}
                   onValueChange={([value]) =>
                     handleHslChange(value, hsl[1], hsl[2])
                   }
+                  orientation="vertical"
+                  step={1}
+                  value={[hsl[0]]}
                 />
               </div>
 
@@ -334,12 +334,12 @@ export function ColorPicker() {
                 <div className="grid grid-cols-4 gap-1">
                   {PRESET_COLORS.map((color) => (
                     <button
-                      key={color}
-                      type="button"
-                      className="h-5 w-full rounded border border-border shadow-sm transition-all hover:scale-105 hover:shadow-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      style={{ backgroundColor: color }}
-                      onClick={() => handlePresetClick(color)}
                       aria-label={`Select color ${color}`}
+                      className="h-5 w-full rounded border border-border shadow-sm transition-all hover:scale-105 hover:shadow-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      key={color}
+                      onClick={() => handlePresetClick(color)}
+                      style={{ backgroundColor: color }}
+                      type="button"
                     />
                   ))}
                 </div>
@@ -352,16 +352,17 @@ export function ColorPicker() {
             {/* RGB Inputs */}
             <div className="grid grid-cols-3 gap-1.5">
               <div className="space-y-0.5">
-                <Label className="text-xs text-muted-foreground" htmlFor="rgb-r">
+                <Label
+                  className="text-muted-foreground text-xs"
+                  htmlFor="rgb-r"
+                >
                   R
                 </Label>
                 <Input
                   className="h-7 text-xs"
                   id="rgb-r"
-                  type="number"
-                  min={0}
                   max={255}
-                  value={rgb[0]}
+                  min={0}
                   onChange={(e) => {
                     const val = Number.parseInt(e.target.value) || 0;
                     handleRgbChange(
@@ -370,19 +371,22 @@ export function ColorPicker() {
                       rgb[2]
                     );
                   }}
+                  type="number"
+                  value={rgb[0]}
                 />
               </div>
               <div className="space-y-0.5">
-                <Label className="text-xs text-muted-foreground" htmlFor="rgb-g">
+                <Label
+                  className="text-muted-foreground text-xs"
+                  htmlFor="rgb-g"
+                >
                   G
                 </Label>
                 <Input
                   className="h-7 text-xs"
                   id="rgb-g"
-                  type="number"
-                  min={0}
                   max={255}
-                  value={rgb[1]}
+                  min={0}
                   onChange={(e) => {
                     const val = Number.parseInt(e.target.value) || 0;
                     handleRgbChange(
@@ -391,19 +395,22 @@ export function ColorPicker() {
                       rgb[2]
                     );
                   }}
+                  type="number"
+                  value={rgb[1]}
                 />
               </div>
               <div className="space-y-0.5">
-                <Label className="text-xs text-muted-foreground" htmlFor="rgb-b">
+                <Label
+                  className="text-muted-foreground text-xs"
+                  htmlFor="rgb-b"
+                >
                   B
                 </Label>
                 <Input
                   className="h-7 text-xs"
                   id="rgb-b"
-                  type="number"
-                  min={0}
                   max={255}
-                  value={rgb[2]}
+                  min={0}
                   onChange={(e) => {
                     const val = Number.parseInt(e.target.value) || 0;
                     handleRgbChange(
@@ -412,6 +419,8 @@ export function ColorPicker() {
                       Math.max(0, Math.min(255, val))
                     );
                   }}
+                  type="number"
+                  value={rgb[2]}
                 />
               </div>
             </div>

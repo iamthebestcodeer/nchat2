@@ -24,6 +24,9 @@ export type BrushSettings = {
 };
 
 type DrawingState = {
+  // Project state
+  projectId: string | null;
+
   // Canvas state
   canvas: HTMLCanvasElement | null;
   context: CanvasRenderingContext2D | null;
@@ -47,6 +50,7 @@ type DrawingState = {
   viewTransform: { x: number; y: number; scale: number };
 
   // Actions
+  setProjectId: (projectId: string | null) => void;
   setCanvas: (canvas: HTMLCanvasElement | null) => void;
   setContext: (context: CanvasRenderingContext2D | null) => void;
   setIsDrawing: (isDrawing: boolean) => void;
@@ -73,7 +77,7 @@ type DrawingState = {
   zoomOut: () => void;
   resetView: () => void;
   saveToStorage: () => void;
-  loadFromStorage: () => Promise<void>;
+  loadFromStorage: (projectId: string) => Promise<void>;
 };
 
 const defaultBrushSettings: BrushSettings = {
@@ -112,6 +116,11 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     }
     saveTimer = setTimeout(() => {
       const state = get();
+      // Don't save if no project ID is set
+      if (!state.projectId) {
+        return;
+      }
+
       const serializedState: SerializableState = {
         brushSettings: state.brushSettings,
         currentTool: state.currentTool,
@@ -119,12 +128,13 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         layers: serializeLayers(state.layers),
         activeLayerId: state.activeLayerId,
       };
-      saveStateToStorage(serializedState);
+      saveStateToStorage(serializedState, state.projectId);
     }, SAVE_DELAY);
   };
 
   return {
     // Initial state
+    projectId: null,
     canvas: null,
     context: null,
     isDrawing: false,
@@ -139,6 +149,8 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     viewTransform: { x: 0, y: 0, scale: 1 },
 
     // Actions
+    setProjectId: (projectId) => set({ projectId }),
+
     setCanvas: (canvas) => {
       if (canvas) {
         const context = canvas.getContext("2d");
@@ -311,6 +323,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
           scale: Math.min(state.viewTransform.scale * 1.1, 5),
         },
       }));
+      debouncedSave();
     },
 
     zoomOut: () => {
@@ -320,6 +333,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
           scale: Math.max(state.viewTransform.scale * 0.9, 0.1),
         },
       }));
+      debouncedSave();
     },
 
     resetView: () => {
@@ -329,6 +343,10 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
 
     saveToStorage: () => {
       const state = get();
+      if (!state.projectId) {
+        return;
+      }
+      
       const serializedState: SerializableState = {
         brushSettings: state.brushSettings,
         currentTool: state.currentTool,
@@ -336,16 +354,33 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         layers: serializeLayers(state.layers),
         activeLayerId: state.activeLayerId,
       };
-      saveStateToStorage(serializedState);
+      saveStateToStorage(serializedState, state.projectId);
     },
 
-    loadFromStorage: async () => {
-      const savedState = loadStateFromStorage();
+    loadFromStorage: async (projectId: string) => {
+      set({ projectId });
+      const savedState = loadStateFromStorage(projectId);
       if (!savedState) {
+        // If no saved state, reset to defaults but keep projectId
+        // Check if projectId still matches before setting state
+        if (get().projectId !== projectId) {
+          return;
+        }
+        set({
+          brushSettings: defaultBrushSettings,
+          currentTool: "brush",
+          viewTransform: { x: 0, y: 0, scale: 1 },
+          layers: [],
+          activeLayerId: null,
+        });
         return;
       }
 
       // Restore brush settings, tool, and view transform
+      // Check if projectId still matches before setting state
+      if (get().projectId !== projectId) {
+        return;
+      }
       set({
         brushSettings: savedState.brushSettings,
         currentTool: savedState.currentTool,
@@ -356,6 +391,11 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       // Restore layers (async operation)
       // deserializeLayers already creates canvases with images drawn
       const restoredLayers = await deserializeLayers(savedState.layers);
+      // Critical check: ensure projectId still matches before setting layers
+      // This prevents loading wrong project's layers if user navigated away
+      if (get().projectId !== projectId) {
+        return;
+      }
       set({ layers: restoredLayers });
     },
   };

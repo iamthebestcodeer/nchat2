@@ -4,13 +4,16 @@ import {
   Brush,
   Download,
   Eraser,
+  Home,
   Redo2,
   RotateCcw,
+  Save,
   Trash2,
   Undo2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { ColorPicker } from "@/components/color/ColorPicker";
 import { Button } from "@/components/ui/button";
 import { GlassPanel } from "@/components/ui/GlassPanel";
@@ -35,7 +38,10 @@ export function FloatingDock() {
     zoomIn,
     zoomOut,
     resetView,
+    saveToStorage,
   } = useDrawingStore();
+
+  const router = useRouter();
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
@@ -52,6 +58,24 @@ export function FloatingDock() {
 
   return (
     <GlassPanel className="-translate-x-1/2 fixed bottom-8 left-1/2 z-50 flex items-center gap-2 p-2">
+      <div className="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="rounded-xl"
+              onClick={() => router.push("/")}
+              size="icon"
+              variant="ghost"
+            >
+              <Home className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Back to Home</TooltipContent>
+        </Tooltip>
+      </div>
+
+      <Separator className="h-8" orientation="vertical" />
+
       <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -171,6 +195,20 @@ export function FloatingDock() {
       <Separator className="h-8" orientation="vertical" />
 
       <div className="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="rounded-xl"
+              onClick={() => saveToStorage()}
+              size="icon"
+              variant="ghost"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Save Project</TooltipContent>
+        </Tooltip>
+
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
