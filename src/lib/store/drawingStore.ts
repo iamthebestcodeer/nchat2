@@ -1,4 +1,11 @@
 import { create } from "zustand";
+import {
+  deserializeLayers,
+  loadStateFromStorage,
+  type SerializableState,
+  saveStateToStorage,
+  serializeLayers,
+} from "../storage";
 
 export type Tool = "brush" | "eraser";
 
@@ -65,6 +72,8 @@ type DrawingState = {
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
+  saveToStorage: () => void;
+  loadFromStorage: () => Promise<void>;
 };
 
 const defaultBrushSettings: BrushSettings = {
@@ -72,6 +81,10 @@ const defaultBrushSettings: BrushSettings = {
   opacity: 1,
   color: "#000000",
 };
+
+// Debounce timer for auto-save
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+const SAVE_DELAY = 500; // ms
 
 export const useDrawingStore = create<DrawingState>((set, get) => {
   const createNewLayer = (): Layer => {
@@ -91,6 +104,23 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       canvas,
       context,
     };
+  };
+
+  const debouncedSave = () => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+    }
+    saveTimer = setTimeout(() => {
+      const state = get();
+      const serializedState: SerializableState = {
+        brushSettings: state.brushSettings,
+        currentTool: state.currentTool,
+        viewTransform: state.viewTransform,
+        layers: serializeLayers(state.layers),
+        activeLayerId: state.activeLayerId,
+      };
+      saveStateToStorage(serializedState);
+    }, SAVE_DELAY);
   };
 
   return {
@@ -124,22 +154,31 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
 
     setLastPosition: (x, y) => set({ lastX: x, lastY: y }),
 
-    setCurrentTool: (tool) => set({ currentTool: tool }),
+    setCurrentTool: (tool) => {
+      set({ currentTool: tool });
+      debouncedSave();
+    },
 
-    setBrushSize: (size) =>
+    setBrushSize: (size) => {
       set((state) => ({
         brushSettings: { ...state.brushSettings, size },
-      })),
+      }));
+      debouncedSave();
+    },
 
-    setBrushOpacity: (opacity) =>
+    setBrushOpacity: (opacity) => {
       set((state) => ({
         brushSettings: { ...state.brushSettings, opacity },
-      })),
+      }));
+      debouncedSave();
+    },
 
-    setBrushColor: (color) =>
+    setBrushColor: (color) => {
       set((state) => ({
         brushSettings: { ...state.brushSettings, color },
-      })),
+      }));
+      debouncedSave();
+    },
 
     addLayer: () => {
       const newLayer = createNewLayer();
@@ -153,6 +192,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         layers: [...state.layers, newLayer],
         activeLayerId: newLayer.id,
       }));
+      debouncedSave();
     },
 
     deleteLayer: (layerId) => {
@@ -168,9 +208,13 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
           activeLayerId: newActiveLayerId,
         };
       });
+      debouncedSave();
     },
 
-    setActiveLayer: (layerId) => set({ activeLayerId: layerId }),
+    setActiveLayer: (layerId) => {
+      set({ activeLayerId: layerId });
+      debouncedSave();
+    },
 
     toggleLayerVisibility: (layerId) => {
       set((state) => ({
@@ -178,6 +222,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
           layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
         ),
       }));
+      debouncedSave();
     },
 
     moveLayer: (layerId, direction) => {
@@ -202,6 +247,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
 
         return { layers };
       });
+      debouncedSave();
     },
 
     saveToHistory: () => {
@@ -253,7 +299,10 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       }
     },
 
-    setViewTransform: (viewTransform) => set({ viewTransform }),
+    setViewTransform: (viewTransform) => {
+      set({ viewTransform });
+      debouncedSave();
+    },
 
     zoomIn: () => {
       set((state) => ({
@@ -275,6 +324,39 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
 
     resetView: () => {
       set({ viewTransform: { x: 0, y: 0, scale: 1 } });
+      debouncedSave();
+    },
+
+    saveToStorage: () => {
+      const state = get();
+      const serializedState: SerializableState = {
+        brushSettings: state.brushSettings,
+        currentTool: state.currentTool,
+        viewTransform: state.viewTransform,
+        layers: serializeLayers(state.layers),
+        activeLayerId: state.activeLayerId,
+      };
+      saveStateToStorage(serializedState);
+    },
+
+    loadFromStorage: async () => {
+      const savedState = loadStateFromStorage();
+      if (!savedState) {
+        return;
+      }
+
+      // Restore brush settings, tool, and view transform
+      set({
+        brushSettings: savedState.brushSettings,
+        currentTool: savedState.currentTool,
+        viewTransform: savedState.viewTransform,
+        activeLayerId: savedState.activeLayerId,
+      });
+
+      // Restore layers (async operation)
+      // deserializeLayers already creates canvases with images drawn
+      const restoredLayers = await deserializeLayers(savedState.layers);
+      set({ layers: restoredLayers });
     },
   };
 });
