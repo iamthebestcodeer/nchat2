@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDrawingStore } from "@/lib/store/drawingStore";
 
-export function DrawingCanvas() {
+export function DrawingCanvas({ projectId }: { projectId: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -68,6 +68,19 @@ export function DrawingCanvas() {
     return () => container.removeEventListener("wheel", handleWheel);
   }, [viewTransform, setViewTransform]);
 
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        saveToStorage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [saveToStorage]);
+
   useEffect(() => {
     const resizeCanvas = () => {
       if (canvasRef.current && containerRef.current) {
@@ -115,7 +128,7 @@ export function DrawingCanvas() {
         setContext(ctx);
 
         // Load persisted state from storage
-        loadFromStorage().then(() => {
+        loadFromStorage(projectId).then(() => {
           // After loading, resize layer canvases to match main canvas
           // and preserve their image content
           const { layers: currentLayers } = useDrawingStore.getState();
@@ -177,7 +190,7 @@ export function DrawingCanvas() {
       setCanvas(null);
       setContext(null);
     };
-  }, [setCanvas, setContext, loadFromStorage]);
+  }, [setCanvas, setContext, loadFromStorage, projectId]);
 
   // Render layers to main canvas
   useEffect(() => {
