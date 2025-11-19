@@ -130,6 +130,7 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [saveToStorage, setCurrentTool]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: canvas and context are refs accessed inside closures, adding them would cause infinite loops
   useEffect(() => {
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Canvas resize logic requires complex layer management
     const resizeCanvas = () => {
@@ -273,10 +274,10 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
       setCanvas(null);
       setContext(null);
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: canvas and context are refs that shouldn't trigger re-runs
   }, [setCanvas, setContext, loadFromStorage, projectId]);
 
   // Render layers to main canvas
+  // biome-ignore lint/correctness/useExhaustiveDependencies: drawShapePreview is a stable function defined in component
   useEffect(() => {
     if (!(canvas && context) || layers.length === 0) {
       return;
@@ -306,7 +307,6 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
       drawShapePreview(context, shapeStart, shapeEnd, currentTool);
       context.restore();
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: drawShapePreview is a stable function defined in component
   }, [canvas, context, layers, isDrawing, shapeStart, shapeEnd, currentTool]);
 
   const getActiveLayer = () => {
@@ -317,12 +317,12 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
   };
 
   // Flood fill algorithm
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Flood fill algorithm requires complex pixel manipulation logic
   const floodFill = (
     ctx: CanvasRenderingContext2D,
     startX: number,
     startY: number,
     fillColor: string
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Flood fill algorithm requires complex pixel manipulation logic
   ) => {
     const imageData = ctx.getImageData(
       0,
@@ -542,9 +542,9 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
     };
   };
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Drawing start logic requires handling multiple tools and states
   const startDrawing = (
     e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Drawing start logic requires handling multiple tools and states
   ) => {
     if (!canvas) {
       return;

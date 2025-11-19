@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { useDrawingStore } from "@/lib/store/drawingStore";
+import { useDrawingStore } from "@/lib/store/drawing-store";
 
 export function BrushControls() {
   const { brushSettings, setBrushSize, setBrushOpacity } = useDrawingStore();

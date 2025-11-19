@@ -1,5 +1,8 @@
 "use client";
 
+import { Home, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -8,9 +11,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Home, Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);

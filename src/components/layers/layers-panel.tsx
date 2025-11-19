@@ -25,7 +25,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useDrawingStore } from "@/lib/store/drawingStore";
+import { useDrawingStore } from "@/lib/store/drawing-store";
 
 export function LayersPanel() {
   const {

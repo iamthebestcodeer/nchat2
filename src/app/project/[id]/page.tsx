@@ -1,10 +1,10 @@
 "use client";
 
 import { use } from "react";
-import { FloatingBrushControls } from "@/components/brush/FloatingBrushControls";
-import { DrawingCanvas } from "@/components/canvas/DrawingCanvas";
-import { FloatingLayers } from "@/components/layers/FloatingLayers";
-import { FloatingDock } from "@/components/toolbar/FloatingDock";
+import { FloatingBrushControls } from "@/components/brush/floating-brush-controls";
+import { DrawingCanvas } from "@/components/canvas/drawing-canvas";
+import { FloatingLayers } from "@/components/layers/floating-layers";
+import { FloatingDock } from "@/components/toolbar/floating-dock";
 
 export default function ProjectPage({
   params,

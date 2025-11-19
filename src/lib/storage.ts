@@ -1,4 +1,4 @@
-import type { BrushSettings, Layer, Tool } from "./store/drawingStore";
+import type { BrushSettings, Layer, Tool } from "./store/drawing-store";
 
 const STORAGE_KEY = "drawing-app-state"; // Legacy key
 const PROJECTS_KEY = "drawing-app-projects";

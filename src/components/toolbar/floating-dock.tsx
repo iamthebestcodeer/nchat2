@@ -2,28 +2,33 @@
 
 import {
   Brush,
+  Circle,
   Download,
   Eraser,
   Home,
+  Minus,
+  PaintBucket,
   Redo2,
   RotateCcw,
   Save,
+  Square,
   Trash2,
   Undo2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ColorPicker } from "@/components/color/ColorPicker";
+import { toast } from "sonner";
+import { ColorPicker } from "@/components/color/color-picker";
 import { Button } from "@/components/ui/button";
-import { GlassPanel } from "@/components/ui/GlassPanel";
+import { GlassPanel } from "@/components/ui/glass-panel";
 import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useDrawingStore } from "@/lib/store/drawingStore";
+import { useDrawingStore } from "@/lib/store/drawing-store";
 
 export function FloatingDock() {
   const {
@@ -54,6 +59,17 @@ export function FloatingDock() {
     link.download = `drawing-${Date.now()}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
+    toast.success("Drawing exported successfully");
+  };
+
+  const handleSave = () => {
+    saveToStorage();
+    toast.success("Project saved");
+  };
+
+  const handleClear = () => {
+    clearCanvas();
+    toast.info("Canvas cleared");
   };
 
   return (
@@ -88,7 +104,7 @@ export function FloatingDock() {
               <Brush className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Brush</TooltipContent>
+          <TooltipContent>Brush (B)</TooltipContent>
         </Tooltip>
 
         <Tooltip>
@@ -102,7 +118,67 @@ export function FloatingDock() {
               <Eraser className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Eraser</TooltipContent>
+          <TooltipContent>Eraser (E)</TooltipContent>
+        </Tooltip>
+      </div>
+
+      <Separator className="h-8" orientation="vertical" />
+
+      <div className="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="rounded-xl"
+              onClick={() => setCurrentTool("rectangle")}
+              size="icon"
+              variant={currentTool === "rectangle" ? "secondary" : "ghost"}
+            >
+              <Square className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Rectangle (R)</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="rounded-xl"
+              onClick={() => setCurrentTool("circle")}
+              size="icon"
+              variant={currentTool === "circle" ? "secondary" : "ghost"}
+            >
+              <Circle className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Circle (C)</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="rounded-xl"
+              onClick={() => setCurrentTool("line")}
+              size="icon"
+              variant={currentTool === "line" ? "secondary" : "ghost"}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Line (L)</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="rounded-xl"
+              onClick={() => setCurrentTool("fill")}
+              size="icon"
+              variant={currentTool === "fill" ? "secondary" : "ghost"}
+            >
+              <PaintBucket className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Fill (F)</TooltipContent>
         </Tooltip>
       </div>
 
@@ -199,7 +275,7 @@ export function FloatingDock() {
           <TooltipTrigger asChild>
             <Button
               className="rounded-xl"
-              onClick={() => saveToStorage()}
+              onClick={handleSave}
               size="icon"
               variant="ghost"
             >
@@ -213,7 +289,7 @@ export function FloatingDock() {
           <TooltipTrigger asChild>
             <Button
               className="rounded-xl text-destructive hover:text-destructive"
-              onClick={clearCanvas}
+              onClick={handleClear}
               size="icon"
               variant="ghost"
             >

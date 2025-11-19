@@ -1,9 +1,9 @@
 "use client";
 
 import { Brush, Eraser } from "lucide-react";
-import { ColorPicker } from "@/components/color/ColorPicker";
+import { ColorPicker } from "@/components/color/color-picker";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDrawingStore } from "@/lib/store/drawingStore";
+import { useDrawingStore } from "@/lib/store/drawing-store";
 
 export function Toolbar() {
   const { currentTool, setCurrentTool } = useDrawingStore();

@@ -1,6 +1,9 @@
 "use client";
 
+import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -30,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { WelcomeModal } from "@/components/ui/WelcomeModal";
+import { WelcomeModal } from "@/components/ui/welcome-modal";
 import {
   createProject,
   deleteProject,
@@ -87,20 +90,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background p-8">
+      <div className="-z-10 fixed inset-0 h-full w-full bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] bg-background" />
       <WelcomeModal />
 
       <div className="mx-auto max-w-6xl space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="font-bold text-4xl tracking-tight">My Projects</h1>
-          <Button onClick={handleCreateProject} size="lg">
-            <Plus className="mr-2 h-5 w-5" /> New Project
-          </Button>
         </div>
 
         <div className="relative">
           <Search className="absolute top-3 left-3 h-5 w-5 text-muted-foreground" />
           <Input
-            className="pl-10 text-lg"
+            className="bg-background/50 pl-10 text-lg backdrop-blur-sm"
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search projects..."
             value={searchQuery}
@@ -108,22 +109,35 @@ export default function Home() {
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* New Project Card */}
+          <Card
+            className="group relative flex cursor-pointer flex-col items-center justify-center gap-4 border-dashed bg-muted/30 transition-all hover:border-primary hover:bg-muted/50 hover:shadow-lg"
+            onClick={handleCreateProject}
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
+              <Plus className="h-8 w-8 text-primary" />
+            </div>
+            <span className="font-medium text-lg">New Project</span>
+          </Card>
+
           {filteredProjects.map((project) => (
             <Card
-              className="group relative overflow-hidden transition-all hover:shadow-lg"
+              className="group hover:-translate-y-1 relative overflow-hidden transition-all hover:shadow-xl"
               key={project.id}
             >
-              <div
-                className="aspect-video w-full cursor-pointer bg-muted/50 transition-colors hover:bg-muted"
-                onClick={() => router.push(`/project/${project.id}`)}
+              <Link
+                className="block aspect-video w-full bg-muted/50 transition-colors hover:bg-muted"
+                href={`/project/${project.id}`}
               >
                 {/* Thumbnail placeholder or actual thumbnail */}
                 <div className="flex h-full items-center justify-center text-muted-foreground">
                   {project.thumbnail ? (
-                    <img
+                    <Image
                       alt={project.name}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      height={200}
                       src={project.thumbnail}
+                      width={300}
                     />
                   ) : (
                     <div className="flex flex-col items-center gap-2">
@@ -131,20 +145,22 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-              </div>
+              </Link>
 
-              <CardFooter className="flex items-center justify-between p-4">
+              <CardFooter className="flex items-center justify-between bg-card/50 p-4 backdrop-blur-sm">
                 <div className="flex flex-col gap-1">
                   <span className="font-semibold">{project.name}</span>
                   <span className="text-muted-foreground text-xs">
-                    {new Date(project.lastModified).toLocaleDateString()}
+                    {formatDistanceToNow(project.lastModified, {
+                      addSuffix: true,
+                    })}
                   </span>
                 </div>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                      className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
                       size="icon"
                       variant="ghost"
                     >
@@ -168,12 +184,11 @@ export default function Home() {
           ))}
         </div>
 
-        {filteredProjects.length === 0 && (
+        {filteredProjects.length === 0 && projects.length > 0 && (
           <div className="flex h-64 flex-col items-center justify-center gap-4 rounded-lg border border-dashed text-muted-foreground">
-            <p className="text-lg">No projects found</p>
-            <Button onClick={handleCreateProject} variant="outline">
-              Create your first project
-            </Button>
+            <p className="text-lg">
+              No projects found matching "{searchQuery}"
+            </p>
           </div>
         )}
       </div>

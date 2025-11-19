@@ -1,5 +1,6 @@
 "use client";
 
+// biome-ignore lint/performance/noNamespaceImport: Radix UI requires namespace import
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import type * as React from "react";
 

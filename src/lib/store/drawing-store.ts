@@ -7,7 +7,13 @@ import {
   serializeLayers,
 } from "../storage";
 
-export type Tool = "brush" | "eraser";
+export type Tool =
+  | "brush"
+  | "eraser"
+  | "rectangle"
+  | "circle"
+  | "line"
+  | "fill";
 
 export type Layer = {
   id: string;
@@ -38,6 +44,10 @@ type DrawingState = {
   currentTool: Tool;
   brushSettings: BrushSettings;
 
+  // Shape drawing state
+  shapeStart: { x: number; y: number } | null;
+  shapeEnd: { x: number; y: number } | null;
+
   // Layers
   layers: Layer[];
   activeLayerId: string | null;
@@ -56,6 +66,9 @@ type DrawingState = {
   setIsDrawing: (isDrawing: boolean) => void;
   setLastPosition: (x: number, y: number) => void;
   setCurrentTool: (tool: Tool) => void;
+  setShapeStart: (pos: { x: number; y: number } | null) => void;
+  setShapeEnd: (pos: { x: number; y: number } | null) => void;
+  clearShapePreview: () => void;
   setBrushSize: (size: number) => void;
   setBrushOpacity: (opacity: number) => void;
   setBrushColor: (color: string) => void;
@@ -142,6 +155,8 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     lastY: 0,
     currentTool: "brush",
     brushSettings: defaultBrushSettings,
+    shapeStart: null,
+    shapeEnd: null,
     layers: [],
     activeLayerId: null,
     history: [],
@@ -170,6 +185,12 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       set({ currentTool: tool });
       debouncedSave();
     },
+
+    setShapeStart: (pos) => set({ shapeStart: pos }),
+
+    setShapeEnd: (pos) => set({ shapeEnd: pos }),
+
+    clearShapePreview: () => set({ shapeStart: null, shapeEnd: null }),
 
     setBrushSize: (size) => {
       set((state) => ({
@@ -346,7 +367,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       if (!state.projectId) {
         return;
       }
-      
+
       const serializedState: SerializableState = {
         brushSettings: state.brushSettings,
         currentTool: state.currentTool,
