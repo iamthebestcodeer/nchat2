@@ -84,7 +84,7 @@ export async function deserializeLayers(
 /**
  * Helper to create canvas from image data (async version)
  */
-function createCanvasFromImageData(
+async function createCanvasFromImageData(
   imageData: string,
   width: number,
   height: number
