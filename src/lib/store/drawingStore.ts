@@ -2,21 +2,21 @@ import { create } from "zustand";
 
 export type Tool = "brush" | "eraser";
 
-export interface Layer {
+export type Layer = {
   id: string;
   name: string;
   visible: boolean;
   canvas: HTMLCanvasElement | null;
   context: CanvasRenderingContext2D | null;
-}
+};
 
-export interface BrushSettings {
+export type BrushSettings = {
   size: number;
   opacity: number;
   color: string;
-}
+};
 
-interface DrawingState {
+type DrawingState = {
   // Canvas state
   canvas: HTMLCanvasElement | null;
   context: CanvasRenderingContext2D | null;
@@ -36,6 +36,9 @@ interface DrawingState {
   history: ImageData[];
   historyIndex: number;
 
+  // View Transform
+  viewTransform: { x: number; y: number; scale: number };
+
   // Actions
   setCanvas: (canvas: HTMLCanvasElement | null) => void;
   setContext: (context: CanvasRenderingContext2D | null) => void;
@@ -54,7 +57,15 @@ interface DrawingState {
   undo: () => void;
   redo: () => void;
   clearCanvas: () => void;
-}
+  setViewTransform: (transform: {
+    x: number;
+    y: number;
+    scale: number;
+  }) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetView: () => void;
+};
 
 const defaultBrushSettings: BrushSettings = {
   size: 10,
@@ -95,6 +106,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     activeLayerId: null,
     history: [],
     historyIndex: -1,
+    viewTransform: { x: 0, y: 0, scale: 1 },
 
     // Actions
     setCanvas: (canvas) => {
@@ -129,29 +141,28 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         brushSettings: { ...state.brushSettings, color },
       })),
 
-  addLayer: () => {
-    const newLayer = createNewLayer();
-    // Resize layer canvas to match main canvas if it exists
-    const { canvas } = get();
-    if (canvas && newLayer.canvas) {
-      newLayer.canvas.width = canvas.width;
-      newLayer.canvas.height = canvas.height;
-    }
-    set((state) => ({
-      layers: [...state.layers, newLayer],
-      activeLayerId: newLayer.id,
-    }));
-  },
+    addLayer: () => {
+      const newLayer = createNewLayer();
+      // Resize layer canvas to match main canvas if it exists
+      const { canvas } = get();
+      if (canvas && newLayer.canvas) {
+        newLayer.canvas.width = canvas.width;
+        newLayer.canvas.height = canvas.height;
+      }
+      set((state) => ({
+        layers: [...state.layers, newLayer],
+        activeLayerId: newLayer.id,
+      }));
+    },
 
     deleteLayer: (layerId) => {
       set((state) => {
         const newLayers = state.layers.filter((layer) => layer.id !== layerId);
-        const newActiveLayerId =
-          state.activeLayerId === layerId
-            ? newLayers.length > 0
-              ? newLayers[newLayers.length - 1].id
-              : null
-            : state.activeLayerId;
+        let newActiveLayerId = state.activeLayerId;
+        if (state.activeLayerId === layerId) {
+          newActiveLayerId =
+            newLayers.length > 0 ? (newLayers.at(-1)?.id ?? null) : null;
+        }
         return {
           layers: newLayers,
           activeLayerId: newActiveLayerId,
@@ -164,9 +175,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     toggleLayerVisibility: (layerId) => {
       set((state) => ({
         layers: state.layers.map((layer) =>
-          layer.id === layerId
-            ? { ...layer, visible: !layer.visible }
-            : layer
+          layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
         ),
       }));
     },
@@ -175,7 +184,9 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       set((state) => {
         const layers = [...state.layers];
         const index = layers.findIndex((layer) => layer.id === layerId);
-        if (index === -1) return state;
+        if (index === -1) {
+          return state;
+        }
 
         if (direction === "up" && index < layers.length - 1) {
           [layers[index], layers[index + 1]] = [
@@ -195,7 +206,9 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
 
     saveToHistory: () => {
       const { canvas, context } = get();
-      if (!canvas || !context) return;
+      if (!(canvas && context)) {
+        return;
+      }
 
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
       set((state) => {
@@ -210,7 +223,9 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
 
     undo: () => {
       const { canvas, context, history, historyIndex } = get();
-      if (!canvas || !context || historyIndex <= 0) return;
+      if (!(canvas && context) || historyIndex <= 0) {
+        return;
+      }
 
       const newIndex = historyIndex - 1;
       const imageData = history[newIndex];
@@ -220,7 +235,9 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
 
     redo: () => {
       const { canvas, context, history, historyIndex } = get();
-      if (!canvas || !context || historyIndex >= history.length - 1) return;
+      if (!(canvas && context) || historyIndex >= history.length - 1) {
+        return;
+      }
 
       const newIndex = historyIndex + 1;
       const imageData = history[newIndex];
@@ -235,6 +252,29 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         get().saveToHistory();
       }
     },
+
+    setViewTransform: (viewTransform) => set({ viewTransform }),
+
+    zoomIn: () => {
+      set((state) => ({
+        viewTransform: {
+          ...state.viewTransform,
+          scale: Math.min(state.viewTransform.scale * 1.1, 5),
+        },
+      }));
+    },
+
+    zoomOut: () => {
+      set((state) => ({
+        viewTransform: {
+          ...state.viewTransform,
+          scale: Math.max(state.viewTransform.scale * 0.9, 0.1),
+        },
+      }));
+    },
+
+    resetView: () => {
+      set({ viewTransform: { x: 0, y: 0, scale: 1 } });
+    },
   };
 });
-

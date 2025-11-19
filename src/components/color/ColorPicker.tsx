@@ -1,16 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Slider } from "@/components/ui/slider";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
 import { useDrawingStore } from "@/lib/store/drawingStore";
 
 function hexToHsl(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const r = Number.parseInt(hex.slice(1, 3), 16) / 255;
+  const g = Number.parseInt(hex.slice(3, 5), 16) / 255;
+  const b = Number.parseInt(hex.slice(5, 7), 16) / 255;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -107,61 +111,69 @@ export function ColorPicker() {
     <Popover>
       <PopoverTrigger asChild>
         <button
-          type="button"
-          className="h-10 w-10 rounded-md border-2 border-border shadow-sm hover:shadow-md transition-shadow ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          style={{ backgroundColor: brushSettings.color }}
           aria-label="Color picker"
+          className="h-10 w-10 rounded-md border-2 border-border shadow-sm ring-offset-background transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          style={{ backgroundColor: brushSettings.color }}
+          type="button"
         />
       </PopoverTrigger>
       <PopoverContent className="w-80">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="hue" className="text-sm font-medium">Hue</Label>
+            <Label className="font-medium text-sm" htmlFor="hue">
+              Hue
+            </Label>
             <Slider
               id="hue"
-              min={0}
               max={360}
-              step={1}
-              value={[hsl[0]]}
+              min={0}
               onValueChange={([value]) =>
                 handleHslChange(value, hsl[1], hsl[2])
               }
+              step={1}
+              value={[hsl[0]]}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="saturation" className="text-sm font-medium">Saturation</Label>
+            <Label className="font-medium text-sm" htmlFor="saturation">
+              Saturation
+            </Label>
             <Slider
               id="saturation"
-              min={0}
               max={100}
-              step={1}
-              value={[hsl[1]]}
+              min={0}
               onValueChange={([value]) =>
                 handleHslChange(hsl[0], value, hsl[2])
               }
+              step={1}
+              value={[hsl[1]]}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lightness" className="text-sm font-medium">Lightness</Label>
+            <Label className="font-medium text-sm" htmlFor="lightness">
+              Lightness
+            </Label>
             <Slider
               id="lightness"
-              min={0}
               max={100}
-              step={1}
-              value={[hsl[2]]}
+              min={0}
               onValueChange={([value]) =>
                 handleHslChange(hsl[0], hsl[1], value)
               }
+              step={1}
+              value={[hsl[2]]}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="hex" className="text-sm font-medium">Hex</Label>
+            <Label className="font-medium text-sm" htmlFor="hex">
+              Hex
+            </Label>
             <Input
+              className="font-mono"
               id="hex"
-              value={brushSettings.color}
               onChange={(e) => handleHexChange(e.target.value)}
               placeholder="#000000"
-              className="font-mono"
+              value={brushSettings.color}
             />
           </div>
         </div>
@@ -169,4 +181,3 @@ export function ColorPicker() {
     </Popover>
   );
 }
-

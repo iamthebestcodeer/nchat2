@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Drawing App - Procreate Alternative",
-  description: "A digital drawing application with layers, brushes, and export functionality",
+  description:
+    "A digital drawing application with layers, brushes, and export functionality",
 };
 
 export default function RootLayout({

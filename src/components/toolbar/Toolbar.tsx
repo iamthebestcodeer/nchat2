@@ -1,23 +1,25 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Brush, Eraser } from "lucide-react";
+import { ColorPicker } from "@/components/color/ColorPicker";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDrawingStore } from "@/lib/store/drawingStore";
-import { ColorPicker } from "@/components/color/ColorPicker";
-import { Brush, Eraser } from "lucide-react";
 
 export function Toolbar() {
   const { currentTool, setCurrentTool } = useDrawingStore();
 
   return (
-    <div className="flex items-center gap-4 border-b border-border bg-card px-6 py-4">
-      <Tabs value={currentTool} onValueChange={(value) => setCurrentTool(value as "brush" | "eraser")}>
+    <div className="flex items-center gap-4 border-border border-b bg-card px-6 py-4">
+      <Tabs
+        onValueChange={(value) => setCurrentTool(value as "brush" | "eraser")}
+        value={currentTool}
+      >
         <TabsList>
-          <TabsTrigger value="brush" className="gap-2">
+          <TabsTrigger className="gap-2" value="brush">
             <Brush className="h-4 w-4" />
             Brush
           </TabsTrigger>
-          <TabsTrigger value="eraser" className="gap-2">
+          <TabsTrigger className="gap-2" value="eraser">
             <Eraser className="h-4 w-4" />
             Eraser
           </TabsTrigger>
@@ -29,4 +31,3 @@ export function Toolbar() {
     </div>
   );
 }
-
