@@ -24,6 +24,8 @@ export function DrawingCanvas() {
     saveToHistory,
     viewTransform,
     setViewTransform,
+    loadFromStorage,
+    saveToStorage,
   } = useDrawingStore();
 
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(
@@ -112,18 +114,61 @@ export function DrawingCanvas() {
         setCanvas(canvasElement);
         setContext(ctx);
 
-        // Initialize with first layer if none exist
-        const { layers: currentLayers } = useDrawingStore.getState();
-        if (currentLayers.length === 0) {
-          useDrawingStore.getState().addLayer();
-          // Resize layer canvas to match main canvas after adding
-          const updatedLayers = useDrawingStore.getState().layers;
-          const newLayer = updatedLayers.at(-1);
-          if (newLayer?.canvas && canvasElement) {
-            newLayer.canvas.width = canvasElement.width;
-            newLayer.canvas.height = canvasElement.height;
+        // Load persisted state from storage
+        loadFromStorage().then(() => {
+          // After loading, resize layer canvases to match main canvas
+          // and preserve their image content
+          const { layers: currentLayers } = useDrawingStore.getState();
+          for (const layer of currentLayers) {
+            if (layer.canvas && layer.context && canvasElement) {
+              // Save the current image data before resizing
+              const imageData = layer.canvas.toDataURL();
+              const oldWidth = layer.canvas.width;
+              const oldHeight = layer.canvas.height;
+
+              // Resize the canvas
+              layer.canvas.width = canvasElement.width;
+              layer.canvas.height = canvasElement.height;
+
+              // Redraw the image content if it exists
+              if (imageData && oldWidth > 0 && oldHeight > 0) {
+                const img = new Image();
+                img.onload = () => {
+                  if (layer.context && layer.canvas) {
+                    layer.context.clearRect(
+                      0,
+                      0,
+                      layer.canvas.width,
+                      layer.canvas.height
+                    );
+                    // Draw the image scaled to fit the new canvas size
+                    layer.context.drawImage(
+                      img,
+                      0,
+                      0,
+                      layer.canvas.width,
+                      layer.canvas.height
+                    );
+                  }
+                };
+                img.src = imageData;
+              }
+            }
           }
-        }
+
+          // Initialize with first layer if none exist after loading
+          const { layers: updatedLayers } = useDrawingStore.getState();
+          if (updatedLayers.length === 0) {
+            useDrawingStore.getState().addLayer();
+            // Resize layer canvas to match main canvas after adding
+            const finalLayers = useDrawingStore.getState().layers;
+            const newLayer = finalLayers.at(-1);
+            if (newLayer?.canvas && canvasElement) {
+              newLayer.canvas.width = canvasElement.width;
+              newLayer.canvas.height = canvasElement.height;
+            }
+          }
+        });
       }
     }
 
@@ -132,7 +177,7 @@ export function DrawingCanvas() {
       setCanvas(null);
       setContext(null);
     };
-  }, [setCanvas, setContext]);
+  }, [setCanvas, setContext, loadFromStorage]);
 
   // Render layers to main canvas
   useEffect(() => {
@@ -267,6 +312,8 @@ export function DrawingCanvas() {
   const stopDrawing = () => {
     if (isDrawing) {
       setIsDrawing(false);
+      // Save to storage after drawing completes
+      saveToStorage();
     }
   };
 
