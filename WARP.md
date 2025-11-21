@@ -50,10 +50,10 @@ Common commands:
 - Uses the Next.js App Router under `src/app`.
 - `src/app/layout.tsx` (if present) defines the root layout, global styles (`src/app/globals.css`), and any shared providers.
 - `src/app/page.tsx` implements the **dashboard/home page**:
-  - Fetches the list of drawing projects from `@/lib/storage` (`getAllProjects`).
-  - Renders a searchable grid of projects.
-  - Uses `NewProjectDialog` and `SettingsModal` from `@/components/dashboard` for project creation and app-level settings.
-  - Navigates to `/project/{id}` via `next/link` for editing a specific project.
+-  - Fetches the list of drawing projects from `@/lib/storage` (`getAllProjects`).
+-  - Renders a static, responsive grid of project cards (no framer-motion), showing each project's last-saved canvas as a thumbnail preview when available.
+-  - Uses `NewProjectDialog` and `SettingsModal` from `@/components/dashboard` for project creation and app-level settings.
+-  - Navigates to `/project/{id}` via `next/link` for editing a specific project.
 - `src/app/project/[id]/page.tsx` implements the **project canvas view**:
   - Extracts the `id` route param and passes it to `DrawingCanvas`.
   - Composes the drawing experience from floating UI layers:

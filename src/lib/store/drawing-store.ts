@@ -128,26 +128,59 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
   };
 
   const generateThumbnail = (): string | undefined => {
-    const { layers, canvas } = get();
-    
-    // Determine dimensions from canvas or fallback to first layer
-    let width = canvas?.width;
-    let height = canvas?.height;
+    const { canvas, layers } = get();
 
-    if (!width || !height) {
-      const firstLayer = layers.find((l) => l.canvas);
-      if (firstLayer?.canvas) {
-        width = firstLayer.canvas.width;
-        height = firstLayer.canvas.height;
+    // Prefer the main composited canvas so the thumbnail always matches
+    // exactly what the user sees in the editor.
+    if (canvas && canvas.width > 0 && canvas.height > 0) {
+      try {
+        const thumbCanvas = document.createElement("canvas");
+        const aspect = canvas.width / canvas.height || 1;
+        const thumbWidth = 300;
+        const thumbHeight = 300 / aspect;
+
+        thumbCanvas.width = thumbWidth;
+        thumbCanvas.height = thumbHeight;
+
+        const ctx = thumbCanvas.getContext("2d");
+        if (!ctx) return undefined;
+
+        // Fill white background so transparent drawings are still visible
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, thumbWidth, thumbHeight);
+
+        // Draw the current canvas contents scaled into the thumbnail
+        ctx.drawImage(
+          canvas,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+          0,
+          0,
+          thumbWidth,
+          thumbHeight
+        );
+
+        return thumbCanvas.toDataURL("image/jpeg", 0.7);
+      } catch (error) {
+        console.error("Error generating thumbnail from canvas:", error);
+        return undefined;
       }
     }
 
-    if (!width || !height) return undefined;
+    // Fallback: if for some reason the main canvas isn't ready yet,
+    // try to build a thumbnail from the first visible layer.
+    const firstLayer = layers.find((layer) => layer.visible && layer.canvas);
+    const layerCanvas = firstLayer?.canvas;
+
+    if (!layerCanvas || layerCanvas.width === 0 || layerCanvas.height === 0) {
+      return undefined;
+    }
 
     try {
-      // Create a small canvas for thumbnail
       const thumbCanvas = document.createElement("canvas");
-      const aspect = width / height;
+      const aspect = layerCanvas.width / layerCanvas.height || 1;
       const thumbWidth = 300;
       const thumbHeight = 300 / aspect;
 
@@ -157,31 +190,24 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       const ctx = thumbCanvas.getContext("2d");
       if (!ctx) return undefined;
 
-      // Fill white background
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, thumbWidth, thumbHeight);
 
-      // Draw all visible layers directly to ensure we capture the latest state
-      // independent of the main canvas state
-      for (const layer of layers) {
-        if (layer.visible && layer.canvas) {
-          ctx.drawImage(
-            layer.canvas,
-            0,
-            0,
-            width,
-            height,
-            0,
-            0,
-            thumbWidth,
-            thumbHeight
-          );
-        }
-      }
+      ctx.drawImage(
+        layerCanvas,
+        0,
+        0,
+        layerCanvas.width,
+        layerCanvas.height,
+        0,
+        0,
+        thumbWidth,
+        thumbHeight
+      );
 
       return thumbCanvas.toDataURL("image/jpeg", 0.7);
     } catch (error) {
-      console.error("Error generating thumbnail:", error);
+      console.error("Error generating thumbnail from layer:", error);
       return undefined;
     }
   };

@@ -1,7 +1,6 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { motion } from "framer-motion";
 import {
   MoreVertical,
   Pencil,
@@ -51,21 +50,6 @@ import {
   type Project,
   renameProject,
 } from "@/lib/storage";
-
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
-};
 
 export default function Home() {
   const router = useRouter();
@@ -148,14 +132,9 @@ export default function Home() {
         </div>
 
         {/* Projects Grid */}
-        <motion.div
-          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          variants={container}
-          initial="hidden"
-          animate="show"
-        >
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {/* New Project Card */}
-          <motion.div variants={item}>
+          <div>
             <NewProjectDialog>
               <Card className="group relative flex h-full min-h-[280px] cursor-pointer flex-col items-center justify-center gap-4 border-dashed bg-muted/30 transition-all hover:border-primary hover:bg-muted/50 hover:shadow-lg">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
@@ -164,11 +143,11 @@ export default function Home() {
                 <span className="font-medium text-lg">New Project</span>
               </Card>
             </NewProjectDialog>
-          </motion.div>
+          </div>
 
           {filteredProjects.map((project) => (
-            <motion.div key={project.id} variants={item}>
-              <Card className="group hover:-translate-y-1 relative overflow-hidden transition-all hover:shadow-xl">
+            <div key={project.id}>
+              <Card className="group relative flex h-full min-h-[280px] cursor-pointer overflow-hidden border bg-card transition-all hover:-translate-y-1 hover:shadow-xl">
                 <Link
                   className="block aspect-video w-full bg-muted/50 transition-colors hover:bg-muted"
                   href={`/project/${project.id}`}
@@ -225,9 +204,9 @@ export default function Home() {
                   </DropdownMenu>
                 </CardFooter>
               </Card>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
 
         {filteredProjects.length === 0 && projects.length > 0 && (
           <div className="flex h-64 flex-col items-center justify-center gap-4 rounded-lg border border-dashed text-muted-foreground">
