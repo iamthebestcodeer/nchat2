@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Settings2, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { GlassPanel } from "@/components/ui/GlassPanel";
+import { GlassPanel } from "@/components/ui/glass-panel";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -12,7 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useDrawingStore } from "@/lib/store/drawingStore";
+import { useDrawingStore } from "@/lib/store/drawing-store";
 
 export function FloatingBrushControls() {
   const [isOpen, setIsOpen] = useState(false);
