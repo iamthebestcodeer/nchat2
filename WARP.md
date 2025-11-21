@@ -75,6 +75,7 @@ Global drawing state and persistence are centralized in `src/lib`:
     - Layer stack (`layers`, `activeLayerId`) where each `Layer` tracks its own off-screen canvas and context.
     - View transform for pan/zoom (`viewTransform: { x, y, scale }`).
     - History stack (`history`, `historyIndex`) for undo/redo.
+    - **Known limitation**: `undoDisabledForLayers: true` – Undo/redo is currently disabled for layer-modifying operations (brush, eraser, shapes, fill) because the history only captures the flattened main canvas ImageData, not individual layer canvases. When undo is invoked, the main canvas is restored but the per-layer canvases remain unchanged, causing undone content to reappear when layers are recomposited. To fix this properly, the history system needs to capture and restore ImageData for each layer's canvas. As a quick fix, `saveToHistory()` calls have been removed from layer-modifying drawing operations in `drawing-canvas.tsx` (lines 566-568, 593-595, 602-604).
   - Exposes a rich set of actions for:
     - Tool/brush updates (`setCurrentTool`, `setBrushSize`, `setBrushOpacity`, `setBrushColor`).
     - Layer management (`addLayer`, `deleteLayer`, `setActiveLayer`, `toggleLayerVisibility`, `moveLayer`).
@@ -110,8 +111,8 @@ Together, `drawing-store.ts` and `storage.ts` form the core of the application's
 
 - `src/components/ui` contains reusable UI primitives (buttons, inputs, dialogs, dropdowns, alert dialogs, etc.), largely following the shadcn/Radix-style composition. These components are consumed throughout the app (`@/components/ui/*`).
 - `src/components/dashboard` implements dashboard-specific UI:
-  - `new-project-dialog.tsx` – modal for creating a new project, wired to `createProject` and navigation to the new project's page.
-  - `settings-modal.tsx` – global settings surface used from the home page header.
+-  - `new-project-dialog.tsx` – modal for creating a new project, wired to `createProject` and navigation to the new project's page. Preset tiles are implemented as semantic `<button>` elements with `aria-pressed` for the selected state and visible `:focus-visible` styles for keyboard users.
+-  - `settings-modal.tsx` – global settings surface used from the home page header.
 - `src/components/canvas`, `src/components/brush`, `src/components/layers`, and `src/components/toolbar` encapsulate the drawing experience for a single project:
   - Canvas rendering, pointer event handling, and delegation to `useDrawingStore` actions.
   - Layer list UI and interactions, including visibility toggles and reordering.

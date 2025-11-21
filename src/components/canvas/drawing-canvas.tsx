@@ -563,7 +563,9 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
     if (currentTool === "fill") {
       // Handle fill tool immediately
       if (activeLayer?.context) {
-        saveToHistory();
+        // NOTE: saveToHistory() removed - history only captures main canvas, not per-layer state.
+        // Undo would revert main canvas but leave layer canvases unchanged, causing ghosting.
+        // TODO: Implement per-layer history (capture/restore each layer.canvas ImageData)
         floodFill(activeLayer.context, x, y, brushSettings.color);
         // Update main canvas
         if (context) {
@@ -588,14 +590,18 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
       setIsDrawing(true);
       setShapeStart({ x, y });
       setShapeEnd({ x, y });
-      saveToHistory();
+      // NOTE: saveToHistory() removed - history only captures main canvas, not per-layer state.
+      // Undo would revert main canvas but leave layer canvases unchanged, causing ghosting.
+      // TODO: Implement per-layer history (capture/restore each layer.canvas ImageData)
       return;
     }
 
     // Brush and eraser tools
     setIsDrawing(true);
     setLastPosition(x, y);
-    saveToHistory();
+    // NOTE: saveToHistory() removed - history only captures main canvas, not per-layer state.
+    // Undo would revert main canvas but leave layer canvases unchanged, causing ghosting.
+    // TODO: Implement per-layer history (capture/restore each layer.canvas ImageData)
   };
 
   const handleDrawing = (

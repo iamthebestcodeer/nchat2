@@ -59,6 +59,8 @@ type DrawingState = {
   // History
   history: ImageData[];
   historyIndex: number;
+  // Undo/redo is disabled for layer operations until per-layer history is implemented
+  undoDisabledForLayers: boolean;
 
   // View Transform
   viewTransform: { x: number; y: number; scale: number };
@@ -277,6 +279,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     activeLayerId: null,
     history: [],
     historyIndex: -1,
+    undoDisabledForLayers: true,
     viewTransform: { x: 0, y: 0, scale: 1 },
 
     // Actions
