@@ -280,7 +280,16 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     viewTransform: { x: 0, y: 0, scale: 1 },
 
     // Actions
-    setProjectId: (projectId) => set({ projectId }),
+    setProjectId: (projectId) =>
+      set({
+        projectId,
+        // Reset transient per-project state whenever switching projects
+        history: [],
+        historyIndex: -1,
+        shapeStart: null,
+        shapeEnd: null,
+        isDrawing: false,
+      }),
 
     setCanvas: (canvas) => {
       if (canvas) {
@@ -495,7 +504,18 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       const projectMeta = projects.find(
         (project) => project.id === projectId
       );
-      set({ projectId, saveError: null, isSaving: false });
+      // When selecting a project, always reset transient drawing state so
+      // each project starts with a clean undo stack and no in-progress shape.
+      set({
+        projectId,
+        saveError: null,
+        isSaving: false,
+        history: [],
+        historyIndex: -1,
+        shapeStart: null,
+        shapeEnd: null,
+        isDrawing: false,
+      });
       const savedState = await loadStateFromStorage(projectId);
       if (!savedState) {
         // If no saved state, reset to defaults but keep projectId
@@ -510,6 +530,12 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
           layers: [],
           activeLayerId: null,
           lastSavedAt: null,
+          // Ensure a brand new project has no history or in-progress shapes
+          history: [],
+          historyIndex: -1,
+          shapeStart: null,
+          shapeEnd: null,
+          isDrawing: false,
         });
         return;
       }
@@ -525,6 +551,13 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         viewTransform: savedState.viewTransform,
         activeLayerId: savedState.activeLayerId,
         lastSavedAt: projectMeta?.lastModified ?? null,
+        // Even when restoring a saved project, always start with an empty
+        // undo stack and no in-progress drawing for this session.
+        history: [],
+        historyIndex: -1,
+        shapeStart: null,
+        shapeEnd: null,
+        isDrawing: false,
       });
 
       // Restore layers (async operation)
