@@ -1,11 +1,21 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  MoreVertical,
+  Pencil,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { NewProjectDialog } from "@/components/dashboard/new-project-dialog";
+import { SettingsModal } from "@/components/dashboard/settings-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +52,21 @@ import {
   renameProject,
 } from "@/lib/storage";
 
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
+
 export default function Home() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -54,26 +79,27 @@ export default function Home() {
   const [newName, setNewName] = useState("");
 
   useEffect(() => {
-    setProjects(getAllProjects());
+    const loadProjects = async () => {
+      const projects = await getAllProjects();
+      setProjects(projects);
+    };
+    loadProjects();
   }, []);
 
-  const handleCreateProject = () => {
-    const project = createProject("Untitled Project");
-    router.push(`/project/${project.id}`);
-  };
-
-  const handleDeleteProject = () => {
+  const handleDeleteProject = async () => {
     if (projectToDelete) {
-      deleteProject(projectToDelete);
-      setProjects(getAllProjects());
+      await deleteProject(projectToDelete);
+      const projects = await getAllProjects();
+      setProjects(projects);
       setProjectToDelete(null);
     }
   };
 
-  const handleRenameProject = () => {
+  const handleRenameProject = async () => {
     if (projectToRename && newName.trim()) {
-      renameProject(projectToRename.id, newName.trim());
-      setProjects(getAllProjects());
+      await renameProject(projectToRename.id, newName.trim());
+      const projects = await getAllProjects();
+      setProjects(projects);
       setProjectToRename(null);
       setNewName("");
     }
@@ -90,99 +116,118 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background p-8">
-      <div className="-z-10 fixed inset-0 h-full w-full bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] bg-background" />
       <WelcomeModal />
 
-      <div className="mx-auto max-w-6xl space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="font-bold text-4xl tracking-tight">My Projects</h1>
-        </div>
-
-        <div className="relative">
-          <Search className="absolute top-3 left-3 h-5 w-5 text-muted-foreground" />
-          <Input
-            className="bg-background/50 pl-10 text-lg backdrop-blur-sm"
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search projects..."
-            value={searchQuery}
-          />
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {/* New Project Card */}
-          <Card
-            className="group relative flex cursor-pointer flex-col items-center justify-center gap-4 border-dashed bg-muted/30 transition-all hover:border-primary hover:bg-muted/50 hover:shadow-lg"
-            onClick={handleCreateProject}
-          >
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
-              <Plus className="h-8 w-8 text-primary" />
+      <div className="mx-auto max-w-6xl space-y-12">
+        {/* Header / Hero */}
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <h1 className="font-bold text-4xl tracking-tight">
+              Welcome back
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Ready to create something amazing?
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute top-3 left-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="bg-background/50 pl-9 backdrop-blur-sm"
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search projects..."
+                value={searchQuery}
+              />
             </div>
-            <span className="font-medium text-lg">New Project</span>
-          </Card>
+            <SettingsModal>
+              <Button size="icon" variant="outline">
+                <Settings className="h-5 w-5" />
+              </Button>
+            </SettingsModal>
+          </div>
+        </div>
+
+        {/* Projects Grid */}
+        <motion.div
+          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          variants={container}
+          initial="hidden"
+          animate="show"
+        >
+          {/* New Project Card */}
+          <motion.div variants={item}>
+            <NewProjectDialog>
+              <Card className="group relative flex h-full min-h-[280px] cursor-pointer flex-col items-center justify-center gap-4 border-dashed bg-muted/30 transition-all hover:border-primary hover:bg-muted/50 hover:shadow-lg">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
+                  <Plus className="h-8 w-8 text-primary" />
+                </div>
+                <span className="font-medium text-lg">New Project</span>
+              </Card>
+            </NewProjectDialog>
+          </motion.div>
 
           {filteredProjects.map((project) => (
-            <Card
-              className="group hover:-translate-y-1 relative overflow-hidden transition-all hover:shadow-xl"
-              key={project.id}
-            >
-              <Link
-                className="block aspect-video w-full bg-muted/50 transition-colors hover:bg-muted"
-                href={`/project/${project.id}`}
-              >
-                {/* Thumbnail placeholder or actual thumbnail */}
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  {project.thumbnail ? (
-                    <Image
-                      alt={project.name}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      height={200}
-                      src={project.thumbnail}
-                      width={300}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="h-12 w-12 rounded-full bg-background/50" />
-                    </div>
-                  )}
-                </div>
-              </Link>
+            <motion.div key={project.id} variants={item}>
+              <Card className="group hover:-translate-y-1 relative overflow-hidden transition-all hover:shadow-xl">
+                <Link
+                  className="block aspect-video w-full bg-muted/50 transition-colors hover:bg-muted"
+                  href={`/project/${project.id}`}
+                >
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    {project.thumbnail ? (
+                      // biome-ignore lint/a11y/useAltText: Alt text is provided via project.name
+                      <img
+                        alt={project.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        src={project.thumbnail}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-12 w-12 rounded-full bg-background/50" />
+                      </div>
+                    )}
+                  </div>
+                </Link>
 
-              <CardFooter className="flex items-center justify-between bg-card/50 p-4 backdrop-blur-sm">
-                <div className="flex flex-col gap-1">
-                  <span className="font-semibold">{project.name}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {formatDistanceToNow(project.lastModified, {
-                      addSuffix: true,
-                    })}
-                  </span>
-                </div>
+                <CardFooter className="flex items-center justify-between bg-card/50 p-4 backdrop-blur-sm">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-semibold">{project.name}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {formatDistanceToNow(project.lastModified, {
+                        addSuffix: true,
+                      })}
+                    </span>
+                  </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openRenameDialog(project)}>
-                      <Pencil className="mr-2 h-4 w-4" /> Rename
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => setProjectToDelete(project.id)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardFooter>
-            </Card>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                        size="icon"
+                        variant="ghost"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => openRenameDialog(project)}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" /> Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setProjectToDelete(project.id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardFooter>
+              </Card>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         {filteredProjects.length === 0 && projects.length > 0 && (
           <div className="flex h-64 flex-col items-center justify-center gap-4 rounded-lg border border-dashed text-muted-foreground">

@@ -1,7 +1,14 @@
+import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { BrushSettings, Layer, Tool } from "./store/drawing-store";
 
-const STORAGE_KEY = "drawing-app-state"; // Legacy key
-const PROJECTS_KEY = "drawing-app-projects";
+const DB_NAME = "drawing-app-db";
+const DB_VERSION = 1;
+const PROJECTS_STORE = "projects";
+const STATES_STORE = "states";
+
+// Legacy keys for migration
+const LEGACY_STORAGE_KEY = "drawing-app-state";
+const LEGACY_PROJECTS_KEY = "drawing-app-projects";
 
 export type Project = {
   id: string;
@@ -26,6 +33,35 @@ export type SerializableState = {
   layers: SerializableLayer[];
   activeLayerId: string | null;
 };
+
+interface DrawingAppDB extends DBSchema {
+  projects: {
+    key: string;
+    value: Project;
+  };
+  states: {
+    key: string;
+    value: SerializableState;
+  };
+}
+
+let dbPromise: Promise<IDBPDatabase<DrawingAppDB>> | null = null;
+
+function getDB() {
+  if (!dbPromise) {
+    dbPromise = openDB<DrawingAppDB>(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains(PROJECTS_STORE)) {
+          db.createObjectStore(PROJECTS_STORE, { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains(STATES_STORE)) {
+          db.createObjectStore(STATES_STORE);
+        }
+      },
+    });
+  }
+  return dbPromise;
+}
 
 /**
  * Converts a canvas element to base64 image data
@@ -138,31 +174,93 @@ function createCanvasFromImageData(
 }
 
 /**
- * Get all projects
+ * Migrate data from localStorage to IndexedDB
  */
-export function getAllProjects(): Project[] {
+async function migrateFromLocalStorage() {
   try {
-    // Check for legacy state and migrate if needed
-    const legacyState = localStorage.getItem(STORAGE_KEY);
-    if (legacyState) {
-      const projects = JSON.parse(localStorage.getItem(PROJECTS_KEY) || "[]");
-      // Only migrate if we haven't already (simple check: if projects is empty but legacy exists)
-      // Or we could just migrate it to a "Untitled Project" and delete legacy
-      if (projects.length === 0) {
-        const newProject: Project = {
-          id: crypto.randomUUID(),
-          name: "Untitled Project",
-          lastModified: Date.now(),
-        };
-        localStorage.setItem(PROJECTS_KEY, JSON.stringify([newProject]));
-        localStorage.setItem(`project-${newProject.id}`, legacyState);
-        localStorage.removeItem(STORAGE_KEY);
-        return [newProject];
-      }
+    const db = await getDB();
+    const projectsJson = localStorage.getItem(LEGACY_PROJECTS_KEY);
+    const legacyState = localStorage.getItem(LEGACY_STORAGE_KEY);
+
+    // Check if we already have projects in IDB
+    const existingProjects = await db.getAll(PROJECTS_STORE);
+    if (existingProjects.length > 0) {
+      return; // Already migrated or used IDB
     }
 
-    const projects = localStorage.getItem(PROJECTS_KEY);
-    return projects ? JSON.parse(projects) : [];
+    if (projectsJson) {
+      const projects: Project[] = JSON.parse(projectsJson);
+      const tx = db.transaction([PROJECTS_STORE, STATES_STORE], "readwrite");
+      
+      for (const project of projects) {
+        await tx.objectStore(PROJECTS_STORE).put(project);
+        const projectState = localStorage.getItem(`project-${project.id}`);
+        if (projectState) {
+          await tx.objectStore(STATES_STORE).put(JSON.parse(projectState), project.id);
+        }
+      }
+      
+      await tx.done;
+    } else if (legacyState) {
+      // Handle single legacy project
+      const newProject: Project = {
+        id: crypto.randomUUID(),
+        name: "Untitled Project",
+        lastModified: Date.now(),
+      };
+      
+      const tx = db.transaction([PROJECTS_STORE, STATES_STORE], "readwrite");
+      await tx.objectStore(PROJECTS_STORE).put(newProject);
+      await tx.objectStore(STATES_STORE).put(JSON.parse(legacyState), newProject.id);
+      await tx.done;
+    }
+    
+    // Optional: Clear localStorage after successful migration
+    // localStorage.removeItem(LEGACY_PROJECTS_KEY);
+    // localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch (error) {
+    console.error("Migration failed:", error);
+  }
+}
+
+/**
+ * Syncs any orphaned states (states without a corresponding project) to the projects store
+ */
+async function syncOrphanedStates(db: IDBPDatabase<DrawingAppDB>) {
+  try {
+    const stateKeys = await db.getAllKeys(STATES_STORE);
+    const projectKeys = await db.getAllKeys(PROJECTS_STORE);
+    const projectKeySet = new Set(projectKeys);
+
+    const missingProjects = stateKeys.filter((key) => !projectKeySet.has(key));
+
+    if (missingProjects.length > 0) {
+      const tx = db.transaction(PROJECTS_STORE, "readwrite");
+      await Promise.all(
+        missingProjects.map((id) =>
+          tx.store.put({
+            id,
+            name: "Recovered Project",
+            lastModified: Date.now(),
+          })
+        )
+      );
+      await tx.done;
+    }
+  } catch (error) {
+    console.error("Error syncing orphaned states:", error);
+  }
+}
+
+/**
+ * Get all projects
+ */
+export async function getAllProjects(): Promise<Project[]> {
+  try {
+    await migrateFromLocalStorage();
+    const db = await getDB();
+    await syncOrphanedStates(db);
+    return await db.getAll(PROJECTS_STORE);
   } catch (error) {
     console.error("Error getting projects:", error);
     return [];
@@ -172,104 +270,91 @@ export function getAllProjects(): Project[] {
 /**
  * Create a new project
  */
-export function createProject(name: string): Project {
+export async function createProject(name: string): Promise<Project> {
   const newProject: Project = {
     id: crypto.randomUUID(),
     name,
     lastModified: Date.now(),
   };
 
-  const projects = getAllProjects();
-  projects.push(newProject);
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
-
+  const db = await getDB();
+  await db.put(PROJECTS_STORE, newProject);
   return newProject;
 }
 
 /**
  * Delete a project
  */
-export function deleteProject(id: string): void {
-  const projects = getAllProjects().filter((p) => p.id !== id);
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
-  localStorage.removeItem(`project-${id}`);
+export async function deleteProject(id: string): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction([PROJECTS_STORE, STATES_STORE], "readwrite");
+  await tx.objectStore(PROJECTS_STORE).delete(id);
+  await tx.objectStore(STATES_STORE).delete(id);
+  await tx.done;
 }
 
 /**
  * Rename a project
  */
-export function renameProject(id: string, newName: string): void {
-  const projects = getAllProjects().map((p) =>
-    p.id === id ? { ...p, name: newName, lastModified: Date.now() } : p
-  );
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+export async function renameProject(id: string, newName: string): Promise<void> {
+  const db = await getDB();
+  const project = await db.get(PROJECTS_STORE, id);
+  if (project) {
+    project.name = newName;
+    project.lastModified = Date.now();
+    await db.put(PROJECTS_STORE, project);
+  }
 }
 
 /**
- * Saves state to localStorage for a specific project
+ * Saves state to IndexedDB for a specific project
  */
-export function saveStateToStorage(
+export async function saveStateToStorage(
   state: SerializableState,
-  projectId?: string
-): boolean {
+  projectId: string,
+  thumbnail?: string
+): Promise<boolean> {
   try {
-    const serialized = JSON.stringify(state);
+    const db = await getDB();
+    const tx = db.transaction([PROJECTS_STORE, STATES_STORE], "readwrite");
+    
+    await tx.objectStore(STATES_STORE).put(state, projectId);
 
-    if (projectId) {
-      localStorage.setItem(`project-${projectId}`, serialized);
-
-      // Update last modified and thumbnail
-      const projects = getAllProjects();
-      const projectIndex = projects.findIndex((p) => p.id === projectId);
-      if (projectIndex !== -1) {
-        // Generate thumbnail from first visible layer or composite
-        // For now, we'll just update the timestamp
-        projects[projectIndex].lastModified = Date.now();
-
-        // Try to generate a thumbnail from the first visible layer
-        const visibleLayer = state.layers.find((l) => l.visible && l.imageData);
-        if (visibleLayer) {
-          // We could store a small thumbnail here, but for now let's just store the timestamp
-          // Storing full base64 in the project list might be too heavy
-        }
-
-        localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    const project = await tx.objectStore(PROJECTS_STORE).get(projectId);
+    if (project) {
+      project.lastModified = Date.now();
+      if (thumbnail) {
+        project.thumbnail = thumbnail;
       }
+      await tx.objectStore(PROJECTS_STORE).put(project);
     } else {
-      // Fallback to legacy key if no projectId provided (shouldn't happen with new flow)
-      localStorage.setItem(STORAGE_KEY, serialized);
+      // If project record is missing but we're saving state, recreate the project record
+      await tx.objectStore(PROJECTS_STORE).put({
+        id: projectId,
+        name: "Untitled Project",
+        lastModified: Date.now(),
+        thumbnail,
+      });
     }
 
+    await tx.done;
     return true;
   } catch (error) {
-    if (error instanceof DOMException && error.name === "QuotaExceededError") {
-      console.error("Storage quota exceeded. Cannot save state.");
-    } else {
-      console.error("Error saving state to storage:", error);
-    }
+    console.error("Error saving state to storage:", error);
     return false;
   }
 }
 
 /**
- * Loads state from localStorage for a specific project
+ * Loads state from IndexedDB for a specific project
  */
-export function loadStateFromStorage(
-  projectId?: string
-): SerializableState | null {
+export async function loadStateFromStorage(
+  projectId: string
+): Promise<SerializableState | null> {
   try {
-    let serialized: string | null = null;
-
-    if (projectId) {
-      serialized = localStorage.getItem(`project-${projectId}`);
-    } else {
-      serialized = localStorage.getItem(STORAGE_KEY);
-    }
-
-    if (!serialized) {
-      return null;
-    }
-    return JSON.parse(serialized) as SerializableState;
+    const db = await getDB();
+    const state = await db.get(STATES_STORE, projectId);
+    return state || null;
   } catch (error) {
     console.error("Error loading state from storage:", error);
     return null;
@@ -277,15 +362,12 @@ export function loadStateFromStorage(
 }
 
 /**
- * Clears saved state from localStorage
+ * Clears saved state from storage
  */
-export function clearStateFromStorage(projectId?: string): void {
+export async function clearStateFromStorage(projectId: string): Promise<void> {
   try {
-    if (projectId) {
-      localStorage.removeItem(`project-${projectId}`);
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    const db = await getDB();
+    await db.delete(STATES_STORE, projectId);
   } catch (error) {
     console.error("Error clearing state from storage:", error);
   }

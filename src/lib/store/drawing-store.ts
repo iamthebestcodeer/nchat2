@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   deserializeLayers,
+  getAllProjects,
   loadStateFromStorage,
   type SerializableState,
   saveStateToStorage,
@@ -32,6 +33,9 @@ export type BrushSettings = {
 type DrawingState = {
   // Project state
   projectId: string | null;
+  isSaving: boolean;
+  lastSavedAt: number | null;
+  saveError: string | null;
 
   // Canvas state
   canvas: HTMLCanvasElement | null;
@@ -89,7 +93,7 @@ type DrawingState = {
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
-  saveToStorage: () => void;
+  saveToStorage: () => Promise<boolean>;
   loadFromStorage: (projectId: string) => Promise<void>;
 };
 
@@ -123,31 +127,117 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     };
   };
 
+  const generateThumbnail = (): string | undefined => {
+    const { layers, canvas } = get();
+    
+    // Determine dimensions from canvas or fallback to first layer
+    let width = canvas?.width;
+    let height = canvas?.height;
+
+    if (!width || !height) {
+      const firstLayer = layers.find((l) => l.canvas);
+      if (firstLayer?.canvas) {
+        width = firstLayer.canvas.width;
+        height = firstLayer.canvas.height;
+      }
+    }
+
+    if (!width || !height) return undefined;
+
+    try {
+      // Create a small canvas for thumbnail
+      const thumbCanvas = document.createElement("canvas");
+      const aspect = width / height;
+      const thumbWidth = 300;
+      const thumbHeight = 300 / aspect;
+
+      thumbCanvas.width = thumbWidth;
+      thumbCanvas.height = thumbHeight;
+
+      const ctx = thumbCanvas.getContext("2d");
+      if (!ctx) return undefined;
+
+      // Fill white background
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, thumbWidth, thumbHeight);
+
+      // Draw all visible layers directly to ensure we capture the latest state
+      // independent of the main canvas state
+      for (const layer of layers) {
+        if (layer.visible && layer.canvas) {
+          ctx.drawImage(
+            layer.canvas,
+            0,
+            0,
+            width,
+            height,
+            0,
+            0,
+            thumbWidth,
+            thumbHeight
+          );
+        }
+      }
+
+      return thumbCanvas.toDataURL("image/jpeg", 0.7);
+    } catch (error) {
+      console.error("Error generating thumbnail:", error);
+      return undefined;
+    }
+  };
+
+  const persistState = async (): Promise<boolean> => {
+    const state = get();
+    if (!state.projectId) {
+      set({ isSaving: false });
+      return false;
+    }
+
+    const serializedState: SerializableState = {
+      brushSettings: state.brushSettings,
+      currentTool: state.currentTool,
+      viewTransform: state.viewTransform,
+      layers: serializeLayers(state.layers),
+      activeLayerId: state.activeLayerId,
+    };
+
+    const thumbnail = generateThumbnail();
+    const didSave = await saveStateToStorage(
+      serializedState,
+      state.projectId,
+      thumbnail
+    );
+
+    set({
+      isSaving: false,
+      lastSavedAt: didSave ? Date.now() : state.lastSavedAt,
+      saveError: didSave ? null : "Unable to save project. Please try again.",
+    });
+
+    saveTimer = null;
+
+    return didSave;
+  };
+
   const debouncedSave = () => {
+    if (!get().projectId) {
+      return;
+    }
     if (saveTimer) {
       clearTimeout(saveTimer);
     }
+    set({ isSaving: true, saveError: null });
     saveTimer = setTimeout(() => {
-      const state = get();
-      // Don't save if no project ID is set
-      if (!state.projectId) {
-        return;
-      }
-
-      const serializedState: SerializableState = {
-        brushSettings: state.brushSettings,
-        currentTool: state.currentTool,
-        viewTransform: state.viewTransform,
-        layers: serializeLayers(state.layers),
-        activeLayerId: state.activeLayerId,
-      };
-      saveStateToStorage(serializedState, state.projectId);
+      persistState();
     }, SAVE_DELAY);
   };
 
   return {
     // Initial state
     projectId: null,
+    isSaving: false,
+    lastSavedAt: null,
+    saveError: null,
     canvas: null,
     context: null,
     isDrawing: false,
@@ -362,25 +452,25 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       debouncedSave();
     },
 
-    saveToStorage: () => {
-      const state = get();
-      if (!state.projectId) {
-        return;
+    saveToStorage: async () => {
+      if (!get().projectId) {
+        return false;
       }
-
-      const serializedState: SerializableState = {
-        brushSettings: state.brushSettings,
-        currentTool: state.currentTool,
-        viewTransform: state.viewTransform,
-        layers: serializeLayers(state.layers),
-        activeLayerId: state.activeLayerId,
-      };
-      saveStateToStorage(serializedState, state.projectId);
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      set({ isSaving: true, saveError: null });
+      return await persistState();
     },
 
     loadFromStorage: async (projectId: string) => {
-      set({ projectId });
-      const savedState = loadStateFromStorage(projectId);
+      const projects = await getAllProjects();
+      const projectMeta = projects.find(
+        (project) => project.id === projectId
+      );
+      set({ projectId, saveError: null, isSaving: false });
+      const savedState = await loadStateFromStorage(projectId);
       if (!savedState) {
         // If no saved state, reset to defaults but keep projectId
         // Check if projectId still matches before setting state
@@ -393,6 +483,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
           viewTransform: { x: 0, y: 0, scale: 1 },
           layers: [],
           activeLayerId: null,
+          lastSavedAt: null,
         });
         return;
       }
@@ -407,6 +498,7 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         currentTool: savedState.currentTool,
         viewTransform: savedState.viewTransform,
         activeLayerId: savedState.activeLayerId,
+        lastSavedAt: projectMeta?.lastModified ?? null,
       });
 
       // Restore layers (async operation)

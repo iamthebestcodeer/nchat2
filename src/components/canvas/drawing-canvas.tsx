@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useDrawingStore } from "@/lib/store/drawing-store";
 
 export function DrawingCanvas({ projectId }: { projectId: string }) {
@@ -89,7 +90,13 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
 
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        saveToStorage();
+        saveToStorage().then((didSave) => {
+          if (didSave) {
+            toast.success("Project saved");
+          } else {
+            toast.error("Unable to save project");
+          }
+        });
         return;
       }
 
@@ -649,6 +656,8 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
         }
       }
       clearShapePreview();
+      saveToStorage();
+    } else if (currentTool === "brush" || currentTool === "eraser") {
       saveToStorage();
     }
 

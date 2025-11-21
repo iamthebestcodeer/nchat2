@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
-import { useDrawingStore } from "@/lib/store/drawingStore";
+import { useDrawingStore } from "@/lib/store/drawing-store";
 
 // Color conversion functions
 function hexToHsl(hex: string): [number, number, number] {
@@ -218,25 +218,25 @@ export function ColorPicker() {
     handleHslChange(hsl[0], s, l);
   };
 
-  const handleColorAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleColorAreaClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     getColorFromPosition(e.clientX, e.clientY);
   };
 
-  const handleColorAreaMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleColorAreaMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!isDragging) {
       return;
     }
     getColorFromPosition(e.clientX, e.clientY);
   };
 
-  const handleColorAreaTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+  const handleColorAreaTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setIsDragging(true);
     const touch = e.touches[0];
     getColorFromPosition(touch.clientX, touch.clientY);
   };
 
-  const handleColorAreaTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+  const handleColorAreaTouchMove = (e: React.TouchEvent<HTMLButtonElement>) => {
     if (!isDragging) {
       return;
     }
