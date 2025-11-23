@@ -1,6 +1,8 @@
 "use client";
 
+// biome-ignore lint/performance/noNamespaceImport: Radix UI requires namespace import
 import * as SliderPrimitive from "@radix-ui/react-slider";
+// biome-ignore lint/performance/noNamespaceImport: React types require namespace import
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -13,15 +15,15 @@ function Slider({
   max = 100,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  );
+  const _values = React.useMemo(() => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (Array.isArray(defaultValue)) {
+      return defaultValue;
+    }
+    return [min, max];
+  }, [value, defaultValue, min, max]);
 
   return (
     <SliderPrimitive.Root
@@ -49,11 +51,12 @@ function Slider({
           data-slot="slider-range"
         />
       </SliderPrimitive.Track>
-      {Array.from({ length: _values.length }, (_, index) => (
+      {_values.map((_value, index) => (
         <SliderPrimitive.Thumb
           className="block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:outline-hidden focus-visible:ring-4 disabled:pointer-events-none disabled:opacity-50"
           data-slot="slider-thumb"
-          key={index}
+          // biome-ignore lint/suspicious/noArrayIndexKey: Slider thumbs are static and don't reorder, index is safe
+          key={`thumb-${index}`}
         />
       ))}
     </SliderPrimitive.Root>

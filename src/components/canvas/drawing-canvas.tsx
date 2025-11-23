@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useDrawingStore } from "@/lib/store/drawing-store";
 
 export function DrawingCanvas({ projectId }: { projectId: string }) {
@@ -89,7 +90,13 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
 
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        saveToStorage();
+        saveToStorage().then((didSave) => {
+          if (didSave) {
+            toast.success("Project saved");
+          } else {
+            toast.error("Unable to save project");
+          }
+        });
         return;
       }
 
@@ -130,6 +137,7 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [saveToStorage, setCurrentTool]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: canvas and context are refs accessed inside closures, adding them would cause infinite loops
   useEffect(() => {
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Canvas resize logic requires complex layer management
     const resizeCanvas = () => {
@@ -273,10 +281,10 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
       setCanvas(null);
       setContext(null);
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: canvas and context are refs that shouldn't trigger re-runs
   }, [setCanvas, setContext, loadFromStorage, projectId]);
 
   // Render layers to main canvas
+  // biome-ignore lint/correctness/useExhaustiveDependencies: drawShapePreview is a stable function defined in component
   useEffect(() => {
     if (!(canvas && context) || layers.length === 0) {
       return;
@@ -306,7 +314,6 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
       drawShapePreview(context, shapeStart, shapeEnd, currentTool);
       context.restore();
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: drawShapePreview is a stable function defined in component
   }, [canvas, context, layers, isDrawing, shapeStart, shapeEnd, currentTool]);
 
   const getActiveLayer = () => {
@@ -317,12 +324,12 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
   };
 
   // Flood fill algorithm
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Flood fill algorithm requires complex pixel manipulation logic
   const floodFill = (
     ctx: CanvasRenderingContext2D,
     startX: number,
     startY: number,
     fillColor: string
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Flood fill algorithm requires complex pixel manipulation logic
   ) => {
     const imageData = ctx.getImageData(
       0,
@@ -542,9 +549,9 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
     };
   };
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Drawing start logic requires handling multiple tools and states
   const startDrawing = (
     e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Drawing start logic requires handling multiple tools and states
   ) => {
     if (!canvas) {
       return;
@@ -556,7 +563,9 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
     if (currentTool === "fill") {
       // Handle fill tool immediately
       if (activeLayer?.context) {
-        saveToHistory();
+        // NOTE: saveToHistory() removed - history only captures main canvas, not per-layer state.
+        // Undo would revert main canvas but leave layer canvases unchanged, causing ghosting.
+        // TODO: Implement per-layer history (capture/restore each layer.canvas ImageData)
         floodFill(activeLayer.context, x, y, brushSettings.color);
         // Update main canvas
         if (context) {
@@ -581,14 +590,18 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
       setIsDrawing(true);
       setShapeStart({ x, y });
       setShapeEnd({ x, y });
-      saveToHistory();
+      // NOTE: saveToHistory() removed - history only captures main canvas, not per-layer state.
+      // Undo would revert main canvas but leave layer canvases unchanged, causing ghosting.
+      // TODO: Implement per-layer history (capture/restore each layer.canvas ImageData)
       return;
     }
 
     // Brush and eraser tools
     setIsDrawing(true);
     setLastPosition(x, y);
-    saveToHistory();
+    // NOTE: saveToHistory() removed - history only captures main canvas, not per-layer state.
+    // Undo would revert main canvas but leave layer canvases unchanged, causing ghosting.
+    // TODO: Implement per-layer history (capture/restore each layer.canvas ImageData)
   };
 
   const handleDrawing = (
@@ -649,6 +662,8 @@ export function DrawingCanvas({ projectId }: { projectId: string }) {
         }
       }
       clearShapePreview();
+      saveToStorage();
+    } else if (currentTool === "brush" || currentTool === "eraser") {
       saveToStorage();
     }
 

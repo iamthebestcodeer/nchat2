@@ -13,14 +13,14 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { GlassPanel } from "@/components/ui/GlassPanel";
+import { GlassPanel } from "@/components/ui/glass-panel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useDrawingStore } from "@/lib/store/drawingStore";
+import { useDrawingStore } from "@/lib/store/drawing-store";
 
 export function FloatingLayers() {
   const [isOpen, setIsOpen] = useState(false);

@@ -1,13 +1,20 @@
 import { create } from "zustand";
 import {
   deserializeLayers,
+  getAllProjects,
   loadStateFromStorage,
   type SerializableState,
   saveStateToStorage,
   serializeLayers,
 } from "../storage";
 
-export type Tool = "brush" | "eraser";
+export type Tool =
+  | "brush"
+  | "eraser"
+  | "rectangle"
+  | "circle"
+  | "line"
+  | "fill";
 
 export type Layer = {
   id: string;
@@ -26,6 +33,9 @@ export type BrushSettings = {
 type DrawingState = {
   // Project state
   projectId: string | null;
+  isSaving: boolean;
+  lastSavedAt: number | null;
+  saveError: string | null;
 
   // Canvas state
   canvas: HTMLCanvasElement | null;
@@ -38,6 +48,10 @@ type DrawingState = {
   currentTool: Tool;
   brushSettings: BrushSettings;
 
+  // Shape drawing state
+  shapeStart: { x: number; y: number } | null;
+  shapeEnd: { x: number; y: number } | null;
+
   // Layers
   layers: Layer[];
   activeLayerId: string | null;
@@ -45,6 +59,8 @@ type DrawingState = {
   // History
   history: ImageData[];
   historyIndex: number;
+  // Undo/redo is disabled for layer operations until per-layer history is implemented
+  undoDisabledForLayers: boolean;
 
   // View Transform
   viewTransform: { x: number; y: number; scale: number };
@@ -56,6 +72,9 @@ type DrawingState = {
   setIsDrawing: (isDrawing: boolean) => void;
   setLastPosition: (x: number, y: number) => void;
   setCurrentTool: (tool: Tool) => void;
+  setShapeStart: (pos: { x: number; y: number } | null) => void;
+  setShapeEnd: (pos: { x: number; y: number } | null) => void;
+  clearShapePreview: () => void;
   setBrushSize: (size: number) => void;
   setBrushOpacity: (opacity: number) => void;
   setBrushColor: (color: string) => void;
@@ -76,7 +95,7 @@ type DrawingState = {
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
-  saveToStorage: () => void;
+  saveToStorage: () => Promise<boolean>;
   loadFromStorage: (projectId: string) => Promise<void>;
 };
 
@@ -110,31 +129,143 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     };
   };
 
+  const generateThumbnail = (): string | undefined => {
+    const { canvas, layers } = get();
+
+    // Prefer the main composited canvas so the thumbnail always matches
+    // exactly what the user sees in the editor.
+    if (canvas && canvas.width > 0 && canvas.height > 0) {
+      try {
+        const thumbCanvas = document.createElement("canvas");
+        const aspect = canvas.width / canvas.height || 1;
+        const thumbWidth = 300;
+        const thumbHeight = 300 / aspect;
+
+        thumbCanvas.width = thumbWidth;
+        thumbCanvas.height = thumbHeight;
+
+        const ctx = thumbCanvas.getContext("2d");
+        if (!ctx) return undefined;
+
+        // Fill white background so transparent drawings are still visible
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, thumbWidth, thumbHeight);
+
+        // Draw the current canvas contents scaled into the thumbnail
+        ctx.drawImage(
+          canvas,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+          0,
+          0,
+          thumbWidth,
+          thumbHeight
+        );
+
+        return thumbCanvas.toDataURL("image/jpeg", 0.7);
+      } catch (error) {
+        console.error("Error generating thumbnail from canvas:", error);
+        return undefined;
+      }
+    }
+
+    // Fallback: if for some reason the main canvas isn't ready yet,
+    // try to build a thumbnail from the first visible layer.
+    const firstLayer = layers.find((layer) => layer.visible && layer.canvas);
+    const layerCanvas = firstLayer?.canvas;
+
+    if (!layerCanvas || layerCanvas.width === 0 || layerCanvas.height === 0) {
+      return undefined;
+    }
+
+    try {
+      const thumbCanvas = document.createElement("canvas");
+      const aspect = layerCanvas.width / layerCanvas.height || 1;
+      const thumbWidth = 300;
+      const thumbHeight = 300 / aspect;
+
+      thumbCanvas.width = thumbWidth;
+      thumbCanvas.height = thumbHeight;
+
+      const ctx = thumbCanvas.getContext("2d");
+      if (!ctx) return undefined;
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, thumbWidth, thumbHeight);
+
+      ctx.drawImage(
+        layerCanvas,
+        0,
+        0,
+        layerCanvas.width,
+        layerCanvas.height,
+        0,
+        0,
+        thumbWidth,
+        thumbHeight
+      );
+
+      return thumbCanvas.toDataURL("image/jpeg", 0.7);
+    } catch (error) {
+      console.error("Error generating thumbnail from layer:", error);
+      return undefined;
+    }
+  };
+
+  const persistState = async (): Promise<boolean> => {
+    const state = get();
+    if (!state.projectId) {
+      set({ isSaving: false });
+      return false;
+    }
+
+    const serializedState: SerializableState = {
+      brushSettings: state.brushSettings,
+      currentTool: state.currentTool,
+      viewTransform: state.viewTransform,
+      layers: serializeLayers(state.layers),
+      activeLayerId: state.activeLayerId,
+    };
+
+    const thumbnail = generateThumbnail();
+    const didSave = await saveStateToStorage(
+      serializedState,
+      state.projectId,
+      thumbnail
+    );
+
+    set({
+      isSaving: false,
+      lastSavedAt: didSave ? Date.now() : state.lastSavedAt,
+      saveError: didSave ? null : "Unable to save project. Please try again.",
+    });
+
+    saveTimer = null;
+
+    return didSave;
+  };
+
   const debouncedSave = () => {
+    if (!get().projectId) {
+      return;
+    }
     if (saveTimer) {
       clearTimeout(saveTimer);
     }
+    set({ isSaving: true, saveError: null });
     saveTimer = setTimeout(() => {
-      const state = get();
-      // Don't save if no project ID is set
-      if (!state.projectId) {
-        return;
-      }
-
-      const serializedState: SerializableState = {
-        brushSettings: state.brushSettings,
-        currentTool: state.currentTool,
-        viewTransform: state.viewTransform,
-        layers: serializeLayers(state.layers),
-        activeLayerId: state.activeLayerId,
-      };
-      saveStateToStorage(serializedState, state.projectId);
+      persistState();
     }, SAVE_DELAY);
   };
 
   return {
     // Initial state
     projectId: null,
+    isSaving: false,
+    lastSavedAt: null,
+    saveError: null,
     canvas: null,
     context: null,
     isDrawing: false,
@@ -142,14 +273,26 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
     lastY: 0,
     currentTool: "brush",
     brushSettings: defaultBrushSettings,
+    shapeStart: null,
+    shapeEnd: null,
     layers: [],
     activeLayerId: null,
     history: [],
     historyIndex: -1,
+    undoDisabledForLayers: true,
     viewTransform: { x: 0, y: 0, scale: 1 },
 
     // Actions
-    setProjectId: (projectId) => set({ projectId }),
+    setProjectId: (projectId) =>
+      set({
+        projectId,
+        // Reset transient per-project state whenever switching projects
+        history: [],
+        historyIndex: -1,
+        shapeStart: null,
+        shapeEnd: null,
+        isDrawing: false,
+      }),
 
     setCanvas: (canvas) => {
       if (canvas) {
@@ -170,6 +313,12 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       set({ currentTool: tool });
       debouncedSave();
     },
+
+    setShapeStart: (pos) => set({ shapeStart: pos }),
+
+    setShapeEnd: (pos) => set({ shapeEnd: pos }),
+
+    clearShapePreview: () => set({ shapeStart: null, shapeEnd: null }),
 
     setBrushSize: (size) => {
       set((state) => ({
@@ -341,25 +490,36 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
       debouncedSave();
     },
 
-    saveToStorage: () => {
-      const state = get();
-      if (!state.projectId) {
-        return;
+    saveToStorage: async () => {
+      if (!get().projectId) {
+        return false;
       }
-      
-      const serializedState: SerializableState = {
-        brushSettings: state.brushSettings,
-        currentTool: state.currentTool,
-        viewTransform: state.viewTransform,
-        layers: serializeLayers(state.layers),
-        activeLayerId: state.activeLayerId,
-      };
-      saveStateToStorage(serializedState, state.projectId);
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      set({ isSaving: true, saveError: null });
+      return await persistState();
     },
 
     loadFromStorage: async (projectId: string) => {
-      set({ projectId });
-      const savedState = loadStateFromStorage(projectId);
+      const projects = await getAllProjects();
+      const projectMeta = projects.find(
+        (project) => project.id === projectId
+      );
+      // When selecting a project, always reset transient drawing state so
+      // each project starts with a clean undo stack and no in-progress shape.
+      set({
+        projectId,
+        saveError: null,
+        isSaving: false,
+        history: [],
+        historyIndex: -1,
+        shapeStart: null,
+        shapeEnd: null,
+        isDrawing: false,
+      });
+      const savedState = await loadStateFromStorage(projectId);
       if (!savedState) {
         // If no saved state, reset to defaults but keep projectId
         // Check if projectId still matches before setting state
@@ -372,6 +532,13 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
           viewTransform: { x: 0, y: 0, scale: 1 },
           layers: [],
           activeLayerId: null,
+          lastSavedAt: null,
+          // Ensure a brand new project has no history or in-progress shapes
+          history: [],
+          historyIndex: -1,
+          shapeStart: null,
+          shapeEnd: null,
+          isDrawing: false,
         });
         return;
       }
@@ -386,6 +553,14 @@ export const useDrawingStore = create<DrawingState>((set, get) => {
         currentTool: savedState.currentTool,
         viewTransform: savedState.viewTransform,
         activeLayerId: savedState.activeLayerId,
+        lastSavedAt: projectMeta?.lastModified ?? null,
+        // Even when restoring a saved project, always start with an empty
+        // undo stack and no in-progress drawing for this session.
+        history: [],
+        historyIndex: -1,
+        shapeStart: null,
+        shapeEnd: null,
+        isDrawing: false,
       });
 
       // Restore layers (async operation)
